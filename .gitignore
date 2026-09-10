@@ -1,0 +1,8 @@
+# File bien dich cua MetaEditor
+*.ex4
+*.ex5
+
+# File tam / log cua MT4
+*.log
+*.bak
+*.tmp
