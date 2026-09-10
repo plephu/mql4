@@ -20,59 +20,45 @@ Include/BBRide/     ->  <MT4 Data Folder>/MQL4/Include/BBRide/
 
 File `.ex4` (bản biên dịch) không đưa lên repo — mỗi máy tự compile bằng MetaEditor (F7).
 
+Toàn bộ logic chiến lược nằm **một chỗ duy nhất** là `Include/BBRide/BBRideCore.mqh`; EA và Indicator đều `#include` file này, nên sửa logic một lần là cả hai cùng đổi.
+
 ## 1. Thành phần
 
 | File | Vai trò |
 |---|---|
-| `Include/BBRide/BBRideCore.mqh` | Toàn bộ logic 5 tầng điều kiện (dùng chung cho EA và Indicator) |
+| `Include/BBRide/BBRideCore.mqh` | **Toàn bộ logic 5 tầng điều kiện, cả 2 chiều BUY/SELL** — nguồn duy nhất |
 | `Experts/BBRide_MTF_EA.mq4` | EA: quét tín hiệu, vào lệnh, quản trị vốn, trailing, dashboard |
-| `Indicators/BBRide_MTF_Signal.mq4` | Indicator: chỉ cảnh báo + vẽ mức Neckline/SL/TP, không vào lệnh |
-| `Experts/BBRide_MTF_EA_Standalone.mq4` | **Bản EA gộp sẵn logic — không cần file Include** |
-| `Indicators/BBRide_MTF_Signal_Standalone.mq4` | **Bản Indicator gộp sẵn logic — không cần file Include** |
+| `Indicators/BBRide_MTF_Signal.mq4` | Indicator: chỉ cảnh báo + vẽ mũi tên/Neckline/SL/TP, không vào lệnh |
 
-> Bản `_Standalone` và bản thường có **logic hoàn toàn giống nhau**, chỉ khác cách tổ chức file. Dùng bản Standalone nếu chỉ muốn chạy; dùng bản có Include nếu sẽ sửa logic (sửa 1 chỗ, cả EA lẫn Indicator cùng đổi).
+Cả 3 file đều cần thiết: EA và Indicator không tự chạy được nếu thiếu `BBRideCore.mqh`.
 
 ## 2. Cài đặt
 
-Có **2 cách**, chọn 1. Nếu ngại tạo thư mục, dùng Cách A.
-
-### Cách A — Bản standalone (đơn giản nhất, KHÔNG cần thư mục Include)
-
-Hai file `*_Standalone.mq4` đã gộp sẵn toàn bộ logic vào trong file, không dùng `#include`:
-
-1. MT4 → `File` → `Open Data Folder` → `MQL4`.
-2. Copy `BBRide_MTF_EA_Standalone.mq4` vào `MQL4/Experts/`.
-3. Copy `BBRide_MTF_Signal_Standalone.mq4` vào `MQL4/Indicators/`.
-4. MetaEditor (F4) → mở từng file → Compile (F7).
-
-Không cần file `BBRideCore.mqh` trong cách này.
-
-### Cách B — Bản có thư viện dùng chung (dễ bảo trì khi sửa logic)
-
-Thư mục `MQL4/Include/BBRide/` **không có sẵn trong MT4 — anh phải tự tạo**:
-
-1. MT4 → `File` → `Open Data Folder` → vào `MQL4/Include/`.
-2. Chuột phải → `New` → `Folder` → đặt tên đúng chữ hoa/thường: `BBRide`.
-3. Copy `BBRideCore.mqh` vào trong thư mục vừa tạo → đường dẫn cuối cùng phải là:
-   `MQL4/Include/BBRide/BBRideCore.mqh`
-4. Copy `BBRide_MTF_EA.mq4` → `MQL4/Experts/`, `BBRide_MTF_Signal.mq4` → `MQL4/Indicators/`.
-5. MetaEditor (F4) → Compile (F7) từng file `.mq4`.
-
-**Cách tạo thư mục ngay trong MetaEditor:** cửa sổ Navigator bên trái → chuột phải vào `Include` → `New Folder` → gõ `BBRide`.
-
-**Không muốn tạo thư mục con?** Đặt `BBRideCore.mqh` thẳng vào `MQL4/Include/`, rồi sửa dòng đầu của 2 file `.mq4`:
-```mq4
-#include <BBRide/BBRideCore.mqh>   // sửa thành:
-#include <BBRideCore.mqh>
-```
+1. Clone repo (hoặc tải ZIP rồi giải nén).
+2. MT4 → `File` → `Open Data Folder` → mở thư mục `MQL4`.
+3. Copy **cả 3 thư mục** `Experts`, `Indicators`, `Include` từ repo vào đè lên `MQL4`. Đường dẫn trong repo đã khớp sẵn, thư mục `Include/BBRide` tự có — **không phải tạo tay**.
+4. Kiểm tra 3 file nằm đúng chỗ:
+   ```
+   MQL4/Include/BBRide/BBRideCore.mqh
+   MQL4/Experts/BBRide_MTF_EA.mq4
+   MQL4/Indicators/BBRide_MTF_Signal.mq4
+   ```
+5. Mở MetaEditor (F4) → compile (F7) `BBRide_MTF_EA.mq4` và `BBRide_MTF_Signal.mq4`. Phải báo `0 error`. Không cần compile file `.mqh`.
+6. Về MT4 → chuột phải trong Navigator → `Refresh`.
 
 ### Lỗi hay gặp khi compile
 
 | Thông báo | Nguyên nhân | Cách xử lý |
 |---|---|---|
-| `cannot open "BBRide/BBRideCore.mqh"` | Chưa tạo thư mục hoặc sai đường dẫn/tên | Kiểm tra đúng `MQL4/Include/BBRide/BBRideCore.mqh`, hoặc chuyển sang bản Standalone |
-| Không thấy EA trong Navigator | Chưa compile, hoặc copy nhầm vào thư mục `MQL5` | Compile lại (F7) → MT4 → chuột phải Navigator → `Refresh` |
-| Copy file khi MT4 đang mở mà không thấy | MT4 chưa quét lại thư mục | Đóng/mở lại MT4, hoặc `Refresh` Navigator |
+| `cannot open "BBRide/BBRideCore.mqh"` | File `.mqh` không nằm đúng `MQL4/Include/BBRide/` | Kiểm tra lại bước 4; chú ý chữ hoa/thường của tên thư mục `BBRide` |
+| Không thấy EA trong Navigator | Chưa compile, hoặc copy nhầm vào thư mục `MQL5` | Compile lại (F7) → MT4 → `Refresh` Navigator |
+| Copy khi MT4 đang mở mà không thấy | MT4 chưa quét lại thư mục | Đóng/mở lại MT4, hoặc `Refresh` Navigator |
+
+**Không muốn dùng thư mục con?** Đặt `BBRideCore.mqh` thẳng vào `MQL4/Include/` rồi sửa dòng `#include` ở đầu 2 file `.mq4`:
+```mq4
+#include <BBRide/BBRideCore.mqh>   // sửa thành:
+#include <BBRideCore.mqh>
+```
 
 ### Sau khi compile
 
