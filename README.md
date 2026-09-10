@@ -2,9 +2,9 @@
 
 Bộ code MQL4 hiện thực hóa quy trình giao dịch top-down, **cả hai chiều**:
 
-> **BUY** — MN1/W1 còn xu hướng **tăng** và chưa chạm **kháng cự** → D1 "đu dây" dải **trên** BB → H1 hồi **xuống** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đáy tăng dần** → phá **lên** neckline.
+> **BUY** — MN1/W1 còn xu hướng **tăng** và chưa chạm **kháng cự** → D1 "đu dây" dải **trên** BB → H1 hồi **xuống** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đáy tăng dần** → phá **lên** neckline **và vượt lên đường trend của nhịp hồi**.
 >
-> **SELL** — MN1/W1 còn xu hướng **giảm** và chưa chạm **hỗ trợ** → D1 "đu dây" dải **dưới** BB → H1 hồi **lên** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đỉnh giảm dần** → phá **xuống** neckline.
+> **SELL** — MN1/W1 còn xu hướng **giảm** và chưa chạm **hỗ trợ** → D1 "đu dây" dải **dưới** BB → H1 hồi **lên** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đỉnh giảm dần** → phá **xuống** neckline **và xuyên xuống đường trend của nhịp hồi**.
 
 Chọn chiều bằng `InpTradeMode`: `0` = cả hai (mặc định), `1` = chỉ BUY, `2` = chỉ SELL.
 
@@ -79,7 +79,8 @@ Cả 3 file đều cần thiết: EA và Indicator không tự chạy được n
 | 2. D1 đu dây | `%B ≥ 0.80` (bám dải **trên**), BB giữa **dốc lên**, giá đóng > BB giữa | `%B ≤ 0.20` (bám dải **dưới**), BB giữa **dốc xuống**, giá đóng < BB giữa |
 | 3. H1 hồi | Giá hồi **xuống** MA10/BB giữa; không nến nào đóng sâu **dưới** vùng; giá còn **trên** MA50 | Giá hồi **lên** MA10/BB giữa; không nến nào đóng sâu **trên** vùng; giá còn **dưới** MA50 |
 | 4. M5/M1 | **2 đáy tăng dần** (đáy 2 > đáy 1) | **2 đỉnh giảm dần** (đỉnh 2 < đỉnh 1) |
-| 5. Trigger | Neckline = **đỉnh** giữa 2 đáy; đóng cửa **phá lên** | Neckline = **đáy** giữa 2 đỉnh; đóng cửa **phá xuống** |
+| 5. Trigger — neckline | Neckline = **đỉnh** giữa 2 đáy; đóng cửa **phá lên** | Neckline = **đáy** giữa 2 đỉnh; đóng cửa **phá xuống** |
+| 5b. Trigger — vượt trend | Đường trend nối **2 đỉnh giảm dần** của nhịp hồi; đóng cửa **vượt lên** | Đường trend nối **2 đáy tăng dần** của nhịp hồi; đóng cửa **xuyên xuống** |
 | SL / TP | SL = đáy 2 − 0.5 ATR; TP = Entry + RR×R, cắt trước kháng cự | SL = đỉnh 2 + 0.5 ATR; TP = Entry − RR×R, cắt trước hỗ trợ |
 
 Điều kiện "BB đang mở rộng" (`InpDReqExpansion`) và "biên độ co lại" (`InpReqContraction`) dùng chung cho cả hai chiều — chúng đo độ rộng, không có hướng.
@@ -120,11 +121,38 @@ Với BB(20, 2.0) trên D1, `%B = (Close − Lower) / (Upper − Lower)`:
 - Điểm xoay thứ 2 phải nằm trong vùng hồi H1.
 - `InpReqContraction`: biên độ trung bình đoạn giữa 2 điểm xoay phải co lại so với đoạn trước đó.
 
-### Tầng 5 — Trigger
+### Tầng 5 — Trigger: phải phá CẢ HAI mức
 
-- **Neckline** = đỉnh cao nhất giữa 2 đáy (BUY) hoặc đáy thấp nhất giữa 2 đỉnh (SELL).
-- Vào lệnh khi nến vừa đóng phá neckline đúng chiều, **và nến trước đó chưa phá** — tránh vào muộn.
-- Entry = Ask (BUY) / Bid (SELL). SL = điểm xoay 2 ± `InpSLBufferATR` × ATR. TP = `InpRR` × R, tự cắt trước kháng cự/hỗ trợ W1. Nếu cản chặn TP xuống dưới `InpMinRR` → **bỏ setup**.
+Setup chỉ được kích hoạt khi giá phá đồng thời 2 thứ, bằng **nến vừa đóng** trên khung vào lệnh:
+
+**a) Neckline (mức ngang)**
+- BUY: đỉnh cao nhất giữa 2 đáy → cần đóng cửa **trên** mức này.
+- SELL: đáy thấp nhất giữa 2 đỉnh → cần đóng cửa **dưới** mức này.
+- Nến trước đó **chưa** được phá — tránh vào muộn khi giá đã chạy.
+
+**b) Đường trend của nhịp hồi (mức nghiêng)** — `InpReqTrendBreak`
+- BUY: nối **2 đỉnh gần nhất** trên M5/M1 (phải là 2 đỉnh **giảm dần**) → đường trend giảm. Cần đóng cửa **vượt lên** đường này.
+- SELL: nối **2 đáy gần nhất** (phải là 2 đáy **tăng dần**) → đường trend tăng. Cần đóng cửa **xuyên xuống**.
+- Đường trend được kéo dài về nến hiện tại theo độ dốc `(giá điểm neo 2 − giá điểm neo 1) / số nến giữa hai điểm`, rồi so sánh với giá đóng cửa.
+- Cũng yêu cầu nến trước chưa phá.
+
+**Vì sao cần cả hai?** Chúng bắt hai việc khác nhau:
+
+| | Neckline (ngang) | Đường trend (nghiêng) |
+|---|---|---|
+| Xác nhận | Giá đã lấy lại được **mức giá** quan trọng | Nhịp điều chỉnh đã **mất đà** |
+| Thời điểm | Muộn hơn — phải chờ vượt hẳn đỉnh cũ | Sớm hơn — gãy ngay khi nhịp hồi yếu đi |
+| Rủi ro nếu chỉ dùng một | Vào muộn, SL xa, RR kém | Dễ nhiễu — gãy trend nhỏ trong một nhịp hồi vẫn còn tiếp |
+
+Bắt buộc cả hai lọc bớt tín hiệu nhưng loại được phần lớn cú phá giả. Muốn nhiều tín hiệu hơn, tắt `InpReqTrendBreak = false` — khi đó chỉ còn điều kiện neckline như trước.
+
+Nếu không tìm được 2 điểm xoay ngược chiều, hoặc chúng **không** dốc đúng chiều (ví dụ tìm BUY nhưng 2 đỉnh lại tăng dần → nhịp hồi chưa yếu), setup bị loại với ghi chú rõ trên dashboard.
+
+### Entry / SL / TP
+
+- Entry = Ask (BUY) / Bid (SELL).
+- SL = điểm xoay 2 ± `InpSLBufferATR` × ATR khung vào lệnh.
+- TP = `InpRR` × R, tự cắt trước kháng cự/hỗ trợ W1. Nếu cản kéo RR thực tế xuống dưới `InpMinRR` → **bỏ setup**.
 
 ## 4. Bảng tham số EA quan trọng
 
@@ -136,6 +164,8 @@ Với BB(20, 2.0) trên D1, `%B = (Close − Lower) / (Upper − Lower)`:
 | `InpDRideThreshold` | 0.80 | 0.90 = khắt khe hơn (SELL tự dùng ngưỡng đối xứng 0.10) |
 | `InpH1TouchATR` | 0.35 | Nới lên 0.5 nếu ít tín hiệu, siết 0.25 nếu vào quá sớm |
 | `InpEntryTF` | M5 | M1 cho tín hiệu nhiều và nhiễu hơn; M5 cân bằng tốt hơn |
+| `InpReqTrendBreak` | true | Bắt buộc vượt đường trend nhịp hồi. Tắt (`false`) nếu muốn nhiều tín hiệu hơn, chấp nhận nhiều phá giả hơn |
+| `InpReqNeckBreak` | true | Bắt buộc phá neckline ngang. Tắt cả hai = vào lệnh ngay khi có mô hình 2 điểm xoay (**không khuyến nghị**) |
 | `InpMaxSpreadPips` | 3.0 | Chặn vào lệnh khi spread giãn (tin tức, phiên Á) |
 | `InpDryRun` | false | **Bật `true` để chạy thử: chỉ cảnh báo, không đặt lệnh thật** |
 
@@ -273,7 +303,7 @@ Dashboard hiển thị đủ 3 con số: `Lenh mo: 1/1 (cap nay) | Toan TK: 2/3 
 
 ## 4.6 Indicator cũng gợi ý khối lượng
 
-`BBRide_MTF_Signal` vẽ mũi tên xanh (BUY) / đỏ (SELL) tại nến trigger, và hiển thị RR thực tế + lot gợi ý theo đúng công thức trên (input `InpRiskPercent`, `InpMinRR`, `InpHighVolFactor`), và cảnh báo `>>> THAP HON RR TOI THIEU ... - NEN BO SETUP` khi RR không đạt — dùng cho anh trade tay.
+`BBRide_MTF_Signal` vẽ mũi tên xanh (BUY) / đỏ (SELL) tại nến trigger, vẽ **đường trend nhịp hồi vừa bị phá** (màu hồng, kéo dài sang phải) cùng các mức Neckline / SL / TP, và hiển thị RR thực tế + lot gợi ý theo đúng công thức trên (input `InpRiskPercent`, `InpMinRR`, `InpHighVolFactor`), và cảnh báo `>>> THAP HON RR TOI THIEU ... - NEN BO SETUP` khi RR không đạt — dùng cho anh trade tay.
 
 ---
 
@@ -304,8 +334,10 @@ Dang xet chieu: SELL  (D du day dai DUOI BB)
 [OK]  3. Con khong gian toi ho tro: 3.10 ATR
 [OK]  4. D1 du day BB: 6 phien, %B=0.09
 [OK]  5. H1 hoi ve vung 188.420
-[--]  6. 2 dinh giam dan (M5)
-Trang thai: SELL: Chua pha XUONG neckline 188.150
+[OK]  6. 2 dinh giam dan (M5)
+        dinh1=188.640  dinh2=188.410  neck=188.150
+[--]  7. Xuyen XUONG duong trend nhip hoi
+Trang thai: SELL: Chua XUYEN XUONG duong trend 188.372
 ---------------- QUAN TRI RUI RO ----------------
 Risk/lenh: 0.75%
 P/L ngay: -38.20 da dong / 0.00 dang treo  =>  lo 0.76%  (tran 2.00%)

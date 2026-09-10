@@ -7,14 +7,16 @@
 //|   2. D1 du day dai TREN BB                                        |
 //|   3. H1 hoi XUONG MA10 / BB giua ma khong gay xu huong            |
 //|   4. M5/M1 tich luy, tao 2 DAY TANG DAN                           |
-//|   5. Pha LEN neckline -> BUY, SL duoi day 2                       |
+//|   5. Pha LEN neckline VA vuot LEN duong trend nhip hoi -> BUY     |
+//|      SL duoi day 2                                                |
 //|                                                                   |
 //|  CHIEU SELL (doi xung):                                           |
 //|   1. MN1 & W1 xu huong GIAM, chua cham ho tro                     |
 //|   2. D1 du day dai DUOI BB                                        |
 //|   3. H1 hoi LEN MA10 / BB giua ma khong gay xu huong              |
 //|   4. M5/M1 tich luy, tao 2 DINH GIAM DAN                          |
-//|   5. Pha XUONG neckline -> SELL, SL tren dinh 2                   |
+//|   5. Pha XUONG neckline VA xuyen XUONG duong trend nhip hoi ->    |
+//|      SELL, SL tren dinh 2                                         |
 //|                                                                   |
 //|  KY LUAT VON (bat buoc, khong the tat bang tay khi dang chay):    |
 //|   - Lot = (Balance x Risk%) / (SL pips x gia tri 1 pip cua 1 lot) |
@@ -25,7 +27,7 @@
 //+------------------------------------------------------------------+
 #property copyright "BBRide MTF"
 #property link      ""
-#property version   "1.30"
+#property version   "1.40"
 #property strict
 
 #include <BBRide/BBRideCore.mqh>
@@ -73,7 +75,8 @@ input int     InpSwingDepth     = 2;       // Do sau fractal cho day
 input double  InpMinHigherLow   = 0.0;     // Day 2 cao hon day 1 toi thieu (xATR)
 input double  InpMaxHigherLow   = 4.0;     // Day 2 cao hon day 1 toi da (xATR)
 input bool    InpReqContraction = true;    // Yeu cau bien do co lai (tich luy)
-input bool    InpReqNeckBreak   = true;    // Yeu cau pha neckline
+input bool    InpReqNeckBreak   = true;    // Yeu cau pha neckline (dinh/day giua 2 diem xoay)
+input bool    InpReqTrendBreak  = true;    // Yeu cau VUOT DUONG TREND cua nhip hoi
 
 //--- ================= KHOI LUONG & RISK/REWARD ====================
 input string  __g5__            = "===== KHOI LUONG & RISK/REWARD =====";
@@ -172,6 +175,7 @@ int OnInit()
    g_set.maxHigherLowATR   = InpMaxHigherLow;
    g_set.requireContraction= InpReqContraction;
    g_set.requireNeckBreak  = InpReqNeckBreak;
+   g_set.requireTrendBreak = InpReqTrendBreak;
 
    g_set.slBufferATR       = InpSLBufferATR;
    g_set.rr                = InpRR;
@@ -211,7 +215,7 @@ int OnInit()
       Print("CANH BAO: ",Symbol()," la san pham bien dong manh - dung LOT CO DINH rat rui ro. ",
             "Nen dat InpRiskPercent > 0 de lot tu dong co giai theo do rong SL.");
 
-   PrintFormat("BBRide MTF EA v1.30 | %s | %s | EntryTF=M%d | Risk=%.2f%% (hieu luc %.2f%%) | RR>=%.2f | Tran lo ngay=%.2f%% (%s)",
+   PrintFormat("BBRide MTF EA v1.40 | %s | %s | EntryTF=M%d | Risk=%.2f%% (hieu luc %.2f%%) | RR>=%.2f | Tran lo ngay=%.2f%% (%s)",
                Symbol(),BBRideModeName(InpTradeMode),(int)InpEntryTF,InpRiskPercent,EffectiveRiskPercent(),
                InpMinRR,InpMaxDailyLossPct,(InpRiskScopeAll?"toan tai khoan":"rieng symbol"));
    return(INIT_SUCCEEDED);

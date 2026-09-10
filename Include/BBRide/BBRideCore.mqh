@@ -71,6 +71,7 @@ struct BBRideSettings
    double            maxHigherLowATR;
    bool              requireContraction;
    bool              requireNeckBreak;
+   bool              requireTrendBreak; // yeu cau pha duong trend cua nhip hoi
    //--- Quan tri rui ro
    double            slBufferATR;
    double            rr;
@@ -90,6 +91,11 @@ struct BBRideSignal
    double            piv1;           // diem xoay thu nhat (day/dinh cu)
    double            piv2;           // diem xoay thu hai (day cao hon / dinh thap hon)
    double            neckline;
+   double            trendLine;      // gia tri duong trend nhip hoi tai nen trigger
+   datetime          tlTime1;        // diem neo 1 cua duong trend (cu hon)
+   double            tlPrice1;
+   datetime          tlTime2;        // diem neo 2 (moi hon)
+   double            tlPrice2;
    datetime          signalBar;
    //--- chan doan tung tang
    bool              okMonthly;
@@ -98,6 +104,7 @@ struct BBRideSignal
    bool              okDailyRide;
    bool              okH1Pullback;
    bool              okDoubleBottom;
+   bool              okTrendBreak;
    bool              okTrigger;
    double            roomATR;
    double            dailyPB;
@@ -141,6 +148,7 @@ void BBRideDefaults(BBRideSettings &s)
    s.maxHigherLowATR   = 4.0;
    s.requireContraction= true;
    s.requireNeckBreak  = true;
+   s.requireTrendBreak = true;
    s.slBufferATR       = 0.5;
    s.rr                = 2.0;
    s.tpAtResistance    = true;
@@ -410,6 +418,81 @@ bool BBRideH1Pullback(const string sym,const BBRideSettings &s,const int dir,dou
   }
 
 //+------------------------------------------------------------------+
+//| DUONG TREND CUA NHIP HOI (tren khung vao lenh)                   |
+//|  BUY : noi 2 DINH gan nhat -> duong trend GIAM cua nhip dieu chinh|
+//|        vao lenh khi gia dong cua VUOT LEN tren duong nay          |
+//|  SELL: noi 2 DAY gan nhat -> duong trend TANG cua nhip hoi        |
+//|        vao lenh khi gia dong cua XUYEN XUONG duoi duong nay       |
+//|                                                                   |
+//|  Duong trend bat tin hieu SOM va chinh xac hon neckline ngang:    |
+//|  neckline chi gay khi gia vuot dinh cu, con duong trend gay ngay  |
+//|  khi nhip dieu chinh mat da.                                      |
+//+------------------------------------------------------------------+
+bool BBRideTrendLineBreak(const string sym,const BBRideSettings &s,const int dir,
+                          double &lineAtSignal,datetime &t1,double &p1,
+                          datetime &t2,double &p2,string &why)
+  {
+   lineAtSignal=0; t1=0; p1=0; t2=0; p2=0; why="";
+   int tf=s.entryTF;
+
+   //--- tim 2 diem xoay NGUOC chieu gan nhat (dinh cho BUY, day cho SELL)
+   int sA=-1,sB=-1;                       // sB = moi hon (shift nho hon)
+   for(int i=s.swingDepth+1;i<=s.entryLookback;i++)
+     {
+      bool isCounter=(dir==BBRIDE_BUY ? BBRideIsSwingHigh(sym,tf,i,s.swingDepth)
+                                      : BBRideIsSwingLow(sym,tf,i,s.swingDepth));
+      if(!isCounter) continue;
+      if(sB<0) { sB=i; continue; }
+      if(sA<0)
+        {
+         if(i-sB<s.swingDepth+2) continue;
+         sA=i;
+         break;
+        }
+     }
+   if(sA<0 || sB<0)
+     { why=(dir==BBRIDE_BUY?"Chua du 2 dinh de dung duong trend":"Chua du 2 day de dung duong trend"); return(false); }
+
+   double vA=(dir==BBRIDE_BUY ? iHigh(sym,tf,sA) : iLow(sym,tf,sA));   // cu hon
+   double vB=(dir==BBRIDE_BUY ? iHigh(sym,tf,sB) : iLow(sym,tf,sB));   // moi hon
+
+   //--- duong trend phai doc NGUOC chieu vao lenh (nhip hoi dang yeu dan)
+   if(dir==BBRIDE_BUY && vB>=vA) { why="Duong trend khong giam - nhip hoi chua yeu"; return(false); }
+   if(dir==BBRIDE_SELL && vB<=vA){ why="Duong trend khong tang - nhip hoi chua yeu"; return(false); }
+
+   int bars=sA-sB;
+   if(bars<=0) { why="Hai diem neo duong trend khong hop le"; return(false); }
+
+   //--- do doc tren moi nen, tinh theo chieu thoi gian tien ve hien tai
+   double slope=(vB-vA)/bars;
+
+   //--- chieu duong trend tai nen vua dong (shift 1) va nen truoc do (shift 2)
+   double lineAt1=vB+slope*(sB-1);
+   double lineAt2=vB+slope*(sB-2);
+
+   double cl1=iClose(sym,tf,1);
+   double cl2=iClose(sym,tf,2);
+   int    digits=(int)MarketInfo(sym,MODE_DIGITS);
+
+   if(dir==BBRIDE_BUY)
+     {
+      if(cl1<=lineAt1) { why="Chua VUOT LEN duong trend "+DoubleToString(lineAt1,digits); return(false); }
+      if(cl2>lineAt2)  { why="Da vuot duong trend tu truoc - bo qua"; return(false); }
+     }
+   else
+     {
+      if(cl1>=lineAt1) { why="Chua XUYEN XUONG duong trend "+DoubleToString(lineAt1,digits); return(false); }
+      if(cl2<lineAt2)  { why="Da xuyen duong trend tu truoc - bo qua"; return(false); }
+     }
+
+   lineAtSignal=lineAt1;
+   t1=iTime(sym,tf,sA); p1=vA;
+   t2=iTime(sym,tf,sB); p2=vB;
+   why="OK";
+   return(true);
+  }
+
+//+------------------------------------------------------------------+
 //| TANG 4+5: M5/M1 - mo hinh 2 diem xoay + pha neckline             |
 //|  BUY : 2 DAY TANG DAN, neckline = dinh giua, pha LEN             |
 //|  SELL: 2 DINH GIAM DAN, neckline = day giua, pha XUONG           |
@@ -520,8 +603,10 @@ void BBRideEvaluateDir(const string sym,const BBRideSettings &s,const int dir,BB
    sig.valid=false; sig.direction=dir;
    sig.entry=0; sig.sl=0; sig.tp=0;
    sig.piv1=0; sig.piv2=0; sig.neckline=0; sig.signalBar=0;
+   sig.trendLine=0; sig.tlTime1=0; sig.tlPrice1=0; sig.tlTime2=0; sig.tlPrice2=0;
    sig.okMonthly=false; sig.okWeekly=false; sig.okRoom=false;
-   sig.okDailyRide=false; sig.okH1Pullback=false; sig.okDoubleBottom=false; sig.okTrigger=false;
+   sig.okDailyRide=false; sig.okH1Pullback=false; sig.okDoubleBottom=false;
+   sig.okTrendBreak=false; sig.okTrigger=false;
    sig.roomATR=0; sig.dailyPB=0; sig.dailyRideCount=0; sig.h1Zone=0; sig.note="";
 
    string dirName=BBRideDirName(dir);
@@ -561,6 +646,18 @@ void BBRideEvaluateDir(const string sym,const BBRideSettings &s,const int dir,BB
    string why="";
    sig.okDoubleBottom=BBRideSwingPattern(sym,s,dir,sig.h1Zone,sig.piv1,sig.piv2,sig.neckline,sig.signalBar,why);
    if(!sig.okDoubleBottom) { sig.note=dirName+": "+why; return; }
+
+   //--- TANG 5b: vuot duong trend cua nhip hoi
+   if(s.requireTrendBreak)
+     {
+      string whyTl="";
+      sig.okTrendBreak=BBRideTrendLineBreak(sym,s,dir,sig.trendLine,
+                                            sig.tlTime1,sig.tlPrice1,sig.tlTime2,sig.tlPrice2,whyTl);
+      if(!sig.okTrendBreak) { sig.note=dirName+": "+whyTl; return; }
+     }
+   else
+      sig.okTrendBreak=true;
+
    sig.okTrigger=true;
 
    //--- Tinh entry / SL / TP
@@ -608,6 +705,7 @@ int BBRideScore(const BBRideSignal &sig)
    if(sig.okDailyRide)    n++;
    if(sig.okH1Pullback)   n++;
    if(sig.okDoubleBottom) n++;
+   if(sig.okTrendBreak)   n++;
    if(sig.valid)          n++;
    return(n);
   }
@@ -678,7 +776,10 @@ string BBRideStatusText(const string sym,const BBRideSettings &s,const BBRideSig
       t+="        "+(isBuy?"day1=":"dinh1=")+DoubleToString(sig.piv1,d)+
          "  "+(isBuy?"day2=":"dinh2=")+DoubleToString(sig.piv2,d)+
          "  neck="+DoubleToString(sig.neckline,d)+"\n";
-   t+=BBRideTick(sig.valid)         +"7. TRIGGER\n";
+   t+=BBRideTick(sig.okTrendBreak)  +"7. "+(isBuy?"Vuot LEN":"Xuyen XUONG")+" duong trend nhip hoi";
+   if(sig.trendLine>0) t+=": "+DoubleToString(sig.trendLine,d);
+   t+="\n";
+   t+=BBRideTick(sig.valid)         +"8. TRIGGER\n";
    if(sig.valid)
       t+="        "+dirName+" "+DoubleToString(sig.entry,d)+"  SL "+DoubleToString(sig.sl,d)+
          "  TP "+DoubleToString(sig.tp,d)+"\n";

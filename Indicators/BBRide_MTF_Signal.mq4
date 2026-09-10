@@ -11,7 +11,7 @@
 //|  Muon backtest hay dung EA BBRide_MTF_EA trong Strategy Tester.   |
 //+------------------------------------------------------------------+
 #property copyright "BBRide MTF"
-#property version   "1.30"
+#property version   "1.40"
 #property strict
 #property indicator_chart_window
 #property indicator_buffers 2
@@ -37,6 +37,7 @@ input double  InpH1TouchATR     = 0.35;      // Dung sai cham vung (xATR H1)
 input ENUM_TIMEFRAMES InpEntryTF= PERIOD_M5; // Khung tim 2 diem xoay
 input int     InpEntryLookback  = 80;        // So nen quet
 input int     InpSwingDepth     = 2;         // Do sau fractal
+input bool    InpReqTrendBreak  = true;      // Yeu cau vuot duong trend cua nhip hoi
 input double  InpRR             = 2.0;       // RR de tinh TP hien thi
 input double  InpMinRR          = 1.5;       // RR toi thieu chap nhan
 input double  InpRiskPercent    = 1.0;       // % rui ro de goi y khoi luong (0 = tat)
@@ -90,6 +91,7 @@ int OnInit()
    g_set.entryTF        = (int)InpEntryTF;
    g_set.entryLookback  = InpEntryLookback;
    g_set.swingDepth     = InpSwingDepth;
+   g_set.requireTrendBreak = InpReqTrendBreak;
    g_set.rr             = InpRR;
 
    if(InpTradeMode<0 || InpTradeMode>2)
@@ -253,6 +255,25 @@ void DrawLevels()
    DrawLine(OBJ_PREFIX+"sl",  g_sig.sl,      clrOrangeRed, STYLE_DOT, "SL");
    DrawLine(OBJ_PREFIX+"tp",  g_sig.tp,      clrLimeGreen, STYLE_DOT, "TP");
    DrawLine(OBJ_PREFIX+"piv2",g_sig.piv2,    clrDodgerBlue,STYLE_DOT, (isBuy?"Day 2":"Dinh 2"));
+   DrawTrendLine();
+  }
+//+------------------------------------------------------------------+
+//| Ve duong trend cua nhip hoi vua bi pha vo                        |
+//+------------------------------------------------------------------+
+void DrawTrendLine()
+  {
+   if(g_sig.tlTime1<=0 || g_sig.tlTime2<=0) return;
+   string nm=OBJ_PREFIX+"trend";
+   if(ObjectFind(0,nm)<0)
+      ObjectCreate(0,nm,OBJ_TREND,0,g_sig.tlTime1,g_sig.tlPrice1,g_sig.tlTime2,g_sig.tlPrice2);
+   ObjectSetInteger(0,nm,OBJPROP_TIME1,g_sig.tlTime1);
+   ObjectSetDouble (0,nm,OBJPROP_PRICE1,g_sig.tlPrice1);
+   ObjectSetInteger(0,nm,OBJPROP_TIME2,g_sig.tlTime2);
+   ObjectSetDouble (0,nm,OBJPROP_PRICE2,g_sig.tlPrice2);
+   ObjectSetInteger(0,nm,OBJPROP_COLOR,clrMagenta);
+   ObjectSetInteger(0,nm,OBJPROP_WIDTH,2);
+   ObjectSetInteger(0,nm,OBJPROP_RAY_RIGHT,true);
+   ObjectSetString (0,nm,OBJPROP_TEXT,"Trend nhip hoi");
   }
 //+------------------------------------------------------------------+
 void DrawLine(const string name,const double price,const color clr,
