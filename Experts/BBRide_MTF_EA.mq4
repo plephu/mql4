@@ -2,18 +2,23 @@
 //|                                              BBRide_MTF_EA.mq4    |
 //|  EA MT4 - "D dang du day BB" + H1 hoi MA10/BB giua + M5 2 day tang|
 //|                                                                   |
+//|  BO KHUNG THAY DOI DUOC (InpPreset):                              |
+//|   0 SWING   : MN1+W1 > D1 du day BB > H1 hoi  > M5 vao lenh       |
+//|   1 INTRADAY: W1+D1  > H1 du day BB > M15 hoi > M5 vao lenh       |
+//|   2 TU CHON : tu dat 4 khung                                      |
+//|                                                                   |
 //|  CHIEU BUY:                                                       |
-//|   1. MN1 & W1 xu huong TANG, chua cham khang cu                   |
-//|   2. D1 du day dai TREN BB                                        |
-//|   3. H1 hoi XUONG MA10 / BB giua ma khong gay xu huong            |
+//|   1. Hai khung lon xu huong TANG, chua cham khang cu              |
+//|   2. Khung "du day" bam dai TREN BB                               |
+//|   3. Khung hoi ve MA10 / BB giua ma khong gay xu huong            |
 //|   4. M5/M1 tich luy, tao 2 DAY TANG DAN                           |
 //|   5. Pha LEN neckline VA vuot LEN duong trend nhip hoi -> BUY     |
 //|      SL duoi day 2                                                |
 //|                                                                   |
 //|  CHIEU SELL (doi xung):                                           |
-//|   1. MN1 & W1 xu huong GIAM, chua cham ho tro                     |
-//|   2. D1 du day dai DUOI BB                                        |
-//|   3. H1 hoi LEN MA10 / BB giua ma khong gay xu huong              |
+//|   1. Hai khung lon xu huong GIAM, chua cham ho tro                |
+//|   2. Khung "du day" bam dai DUOI BB                               |
+//|   3. Khung hoi LEN MA10 / BB giua ma khong gay xu huong           |
 //|   4. M5/M1 tich luy, tao 2 DINH GIAM DAN                          |
 //|   5. Pha XUONG neckline VA xuyen XUONG duong trend nhip hoi ->    |
 //|      SELL, SL tren dinh 2                                         |
@@ -27,7 +32,7 @@
 //+------------------------------------------------------------------+
 #property copyright "BBRide MTF"
 #property link      ""
-#property version   "1.40"
+#property version   "1.50"
 #property strict
 
 #include <BBRide/BBRideCore.mqh>
@@ -36,16 +41,24 @@
 input string  __g0__            = "===== CHE DO GIAO DICH =====";
 input int     InpTradeMode      = 0;       // 0 = ca hai chieu | 1 = chi BUY | 2 = chi SELL
 
-//--- ================= THAM SO KHUNG LON (MN1 / W1) =================
-input string  __g1__            = "===== KHUNG LON (MN1 / W1) =====";
-input bool    InpUseMonthly     = true;    // Bat loc xu huong MN1
-input int     InpMnFast         = 5;       // MN1: MA nhanh
-input int     InpMnSlow         = 10;      // MN1: MA cham
-input bool    InpUseWeekly      = true;    // Bat loc xu huong W1
-input int     InpWFast          = 10;      // W1: MA nhanh
-input int     InpWSlow          = 20;      // W1: MA cham
+//--- ================= BO KHUNG THOI GIAN ==========================
+input string  __g0b__           = "===== BO KHUNG THOI GIAN =====";
+input int     InpPreset         = 0;       // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H1>M15>M5) | 2 = TU CHON
+input ENUM_TIMEFRAMES InpTfTrend1  = PERIOD_MN1; // [TU CHON] khung xu huong lon nhat
+input ENUM_TIMEFRAMES InpTfTrend2  = PERIOD_W1;  // [TU CHON] khung xu huong 2 + quet khang cu/ho tro
+input ENUM_TIMEFRAMES InpTfRide    = PERIOD_D1;  // [TU CHON] khung du day BB
+input ENUM_TIMEFRAMES InpTfPullback= PERIOD_H1;  // [TU CHON] khung hoi ve MA10/BB giua
+
+//--- ================= THAM SO KHUNG XU HUONG LON ==================
+input string  __g1__            = "===== KHUNG XU HUONG LON =====";
+input bool    InpUseMonthly     = true;    // Bat loc xu huong khung 1 (MN1/W1)
+input int     InpMnFast         = 5;       // Khung 1: MA nhanh
+input int     InpMnSlow         = 10;      // Khung 1: MA cham
+input bool    InpUseWeekly      = true;    // Bat loc xu huong khung 2 (W1/D1)
+input int     InpWFast          = 10;      // Khung 2: MA nhanh
+input int     InpWSlow          = 20;      // Khung 2: MA cham
 input ENUM_MA_METHOD InpMaMethod= MODE_EMA;// Phuong phap MA
-input int     InpResLookback    = 60;      // So nen W1 quet khang cu
+input int     InpResLookback    = 60;      // So nen khung 2 quet khang cu/ho tro
 input int     InpResDepth       = 2;       // Do sau fractal xac dinh dinh
 input double  InpMinRoomATR     = 1.5;     // Khoang trong toi thieu toi khang cu (xATR W1)
 
@@ -60,12 +73,12 @@ input bool    InpDReqExpansion  = true;    // Yeu cau BB dang mo rong
 
 //--- ================= THAM SO H1 - PULLBACK =======================
 input string  __g3__            = "===== H1 HOI VE TREND THUAN =====";
-input int     InpH1MaPeriod     = 10;      // MA10 tren H1
-input bool    InpH1UseBBMid     = true;    // Chap nhan cham BB giua H1
-input double  InpH1TouchATR     = 0.35;    // Dung sai cham vung (xATR H1)
-input int     InpH1PullbackBars = 6;       // So nen H1 gan nhat tim cu cham
-input double  InpH1MinExtATR    = 1.0;     // Song tang truoc do toi thieu (xATR H1)
-input int     InpH1TrendMa      = 50;      // MA loc xu huong H1
+input int     InpPbMaPeriod     = 10;      // MA10 tren H1
+input bool    InpPbUseBBMid     = true;    // Chap nhan cham BB giua H1
+input double  InpPbTouchATR     = 0.35;    // Dung sai cham vung (xATR H1)
+input int     InpPbBars = 6;       // So nen H1 gan nhat tim cu cham
+input double  InpPbMinExtATR    = 1.0;     // Song tang truoc do toi thieu (xATR H1)
+input int     InpPbTrendMa      = 50;      // MA loc xu huong H1
 
 //--- ================= THAM SO KHUNG VAO LENH ======================
 input string  __g4__            = "===== KHUNG VAO LENH (M5/M1) =====";
@@ -120,8 +133,8 @@ input int     InpMagic          = 20260910;// Magic number
 //--- ================= QUAN LY LENH DANG MO ========================
 input string  __g9__            = "===== QUAN LY LENH DANG MO =====";
 input bool    InpBreakEvenAt1R  = true;    // Dua SL ve hoa von khi lai 1R
-input bool    InpTrailBBMidH1   = true;    // Trailing theo BB giua H1
-input bool    InpCloseOnH1Break = false;   // Dong lenh khi H1 dong duoi BB giua
+input bool    InpTrailBBMidH1   = true;    // Trailing theo BB giua cua khung hoi (H1/M15)
+input bool    InpCloseOnH1Break = false;   // Dong lenh khi khung hoi dong cua gay BB giua
 
 //--- ================= HIEN THI / CANH BAO =========================
 input string  __g10__           = "===== HIEN THI / CANH BAO =====";
@@ -161,14 +174,13 @@ int OnInit()
    g_set.dRideThreshold    = InpDRideThreshold;
    g_set.dRequireExpansion = InpDReqExpansion;
 
-   g_set.h1MaPeriod        = InpH1MaPeriod;
-   g_set.h1UseBBMid        = InpH1UseBBMid;
-   g_set.h1TouchATR        = InpH1TouchATR;
-   g_set.h1PullbackBars    = InpH1PullbackBars;
-   g_set.h1MinExtensionATR = InpH1MinExtATR;
-   g_set.h1TrendMa         = InpH1TrendMa;
+   g_set.pbMaPeriod        = InpPbMaPeriod;
+   g_set.pbUseBBMid        = InpPbUseBBMid;
+   g_set.pbTouchATR        = InpPbTouchATR;
+   g_set.pbBars    = InpPbBars;
+   g_set.pbMinExtATR = InpPbMinExtATR;
+   g_set.pbTrendMa         = InpPbTrendMa;
 
-   g_set.entryTF           = (int)InpEntryTF;
    g_set.entryLookback     = InpEntryLookback;
    g_set.swingDepth        = InpSwingDepth;
    g_set.minHigherLowATR   = InpMinHigherLow;
@@ -182,10 +194,38 @@ int OnInit()
    g_set.tpAtResistance    = InpTPAtResistance;
    g_set.tradeMode         = InpTradeMode;
 
+   //--- bo khung thoi gian: preset hoac tu chon
+   if(InpPreset==BBRIDE_PRESET_CUSTOM)
+     {
+      g_set.tfTrend1   = (int)InpTfTrend1;
+      g_set.tfTrend2   = (int)InpTfTrend2;
+      g_set.tfRide     = (int)InpTfRide;
+      g_set.tfPullback = (int)InpTfPullback;
+     }
+   else
+      BBRideApplyPreset(g_set,InpPreset);
+
+   //--- khung vao lenh luon lay theo InpEntryTF (preset chi dat 4 khung tren)
+   g_set.entryTF = (int)InpEntryTF;
+
    //--- kiem tra tham so
    if(InpDMinRideBars>InpDRideLookback)
      {
       Print("Loi tham so: InpDMinRideBars phai <= InpDRideLookback");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(InpPreset<0 || InpPreset>2)
+     {
+      Print("Loi tham so: InpPreset chi nhan 0 (SWING), 1 (INTRADAY) hoac 2 (TU CHON)");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(!(g_set.tfTrend1>g_set.tfTrend2 && g_set.tfTrend2>g_set.tfRide &&
+        g_set.tfRide>g_set.tfPullback && g_set.tfPullback>g_set.entryTF))
+     {
+      Print("Loi tham so: bo khung phai giam dan: ",
+            BBRideTFName(g_set.tfTrend1)," > ",BBRideTFName(g_set.tfTrend2)," > ",
+            BBRideTFName(g_set.tfRide)," > ",BBRideTFName(g_set.tfPullback)," > ",
+            BBRideTFName(g_set.entryTF));
       return(INIT_PARAMETERS_INCORRECT);
      }
    if(InpTradeMode<0 || InpTradeMode>2)
@@ -215,8 +255,11 @@ int OnInit()
       Print("CANH BAO: ",Symbol()," la san pham bien dong manh - dung LOT CO DINH rat rui ro. ",
             "Nen dat InpRiskPercent > 0 de lot tu dong co giai theo do rong SL.");
 
-   PrintFormat("BBRide MTF EA v1.40 | %s | %s | EntryTF=M%d | Risk=%.2f%% (hieu luc %.2f%%) | RR>=%.2f | Tran lo ngay=%.2f%% (%s)",
-               Symbol(),BBRideModeName(InpTradeMode),(int)InpEntryTF,InpRiskPercent,EffectiveRiskPercent(),
+   PrintFormat("BBRide MTF EA v1.50 | %s | %s | Khung: %s+%s > %s > %s > %s | Risk=%.2f%% (hieu luc %.2f%%) | RR>=%.2f | Tran lo ngay=%.2f%% (%s)",
+               Symbol(),BBRideModeName(InpTradeMode),
+               BBRideTFName(g_set.tfTrend1),BBRideTFName(g_set.tfTrend2),BBRideTFName(g_set.tfRide),
+               BBRideTFName(g_set.tfPullback),BBRideTFName(g_set.entryTF),
+               InpRiskPercent,EffectiveRiskPercent(),
                InpMinRR,InpMaxDailyLossPct,(InpRiskScopeAll?"toan tai khoan":"rieng symbol"));
    return(INIT_SUCCEEDED);
   }
@@ -232,7 +275,7 @@ void OnTick()
    ManageOpenTrades();
 
    //--- chi danh gia tin hieu khi co nen moi tren khung vao lenh
-   datetime curBar=iTime(Symbol(),(int)InpEntryTF,0);
+   datetime curBar=iTime(Symbol(),g_set.entryTF,0);
    if(curBar==g_lastCalcBar) return;
    g_lastCalcBar=curBar;
 
@@ -767,8 +810,8 @@ void ManageOpenTrades()
    double minDist=MarketInfo(Symbol(),MODE_STOPLEVEL)*point;
    double bid    =MarketInfo(Symbol(),MODE_BID);
    double ask    =MarketInfo(Symbol(),MODE_ASK);
-   double bbMidH1=iBands(Symbol(),PERIOD_H1,InpBBPeriod,InpBBDev,0,PRICE_CLOSE,MODE_MAIN,0);
-   double closeH1=iClose(Symbol(),PERIOD_H1,1);
+   double bbMidPb=iBands(Symbol(),g_set.tfPullback,InpBBPeriod,InpBBDev,0,PRICE_CLOSE,MODE_MAIN,0);
+   double closePb=iClose(Symbol(),g_set.tfPullback,1);
 
    for(int i=OrdersTotal()-1;i>=0;i--)
      {
@@ -784,12 +827,12 @@ void ManageOpenTrades()
       //--- thoat khi H1 dong cua gay trend thuan
       if(InpCloseOnH1Break)
         {
-         bool broken=(isBuy ? closeH1<bbMidH1 : closeH1>bbMidH1);
+         bool broken=(isBuy ? closePb<bbMidPb : closePb>bbMidPb);
          if(broken)
            {
             double px=(isBuy?bid:ask);
             if(OrderClose(OrderTicket(),OrderLots(),px,InpSlippage,clrOrangeRed))
-               Print("Dong lenh #",OrderTicket()," do H1 dong ",(isBuy?"duoi":"tren")," BB giua");
+               Print("Dong lenh #",OrderTicket()," do ",BBRideTFName(g_set.tfPullback)," dong ",(isBuy?"duoi":"tren")," BB giua");
             continue;
            }
         }
@@ -804,8 +847,8 @@ void ManageOpenTrades()
             if(r>0.0 && bid-open>=r) newSl=MathMax(newSl,open);
            }
          //--- trailing theo BB giua H1 (chi keo LEN)
-         if(InpTrailBBMidH1 && bbMidH1>0.0 && bbMidH1>newSl && bbMidH1<bid-minDist)
-            newSl=bbMidH1;
+         if(InpTrailBBMidH1 && bbMidPb>0.0 && bbMidPb>newSl && bbMidPb<bid-minDist)
+            newSl=bbMidPb;
          //--- CHAN CUNG: SL khong bao gio lui ve sau
          if(newSl<sl) newSl=sl;
 
@@ -825,8 +868,8 @@ void ManageOpenTrades()
             if(r>0.0 && open-ask>=r) newSl=MathMin(newSl,open);
            }
          //--- trailing theo BB giua H1 (chi keo XUONG)
-         if(InpTrailBBMidH1 && bbMidH1>0.0 && bbMidH1<newSl && bbMidH1>ask+minDist)
-            newSl=bbMidH1;
+         if(InpTrailBBMidH1 && bbMidPb>0.0 && bbMidPb<newSl && bbMidPb>ask+minDist)
+            newSl=bbMidPb;
          //--- CHAN CUNG: SL khong bao gio noi rong len tren
          if(sl>0.0 && newSl>sl) newSl=sl;
 

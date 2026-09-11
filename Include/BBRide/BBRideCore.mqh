@@ -37,11 +37,16 @@ struct BBRideSettings
   {
    //--- Che do
    int               tradeMode;         // 0=ca hai chieu, 1=chi BUY, 2=chi SELL
+   //--- Bo khung thoi gian (thay doi duoc -> mot bo logic dung cho nhieu kich ban)
+   int               tfTrend1;          // khung xu huong lon nhat   (MN1 / W1)
+   int               tfTrend2;          // khung xu huong thu hai + quet khang cu/ho tro (W1 / D1)
+   int               tfRide;            // khung "du day BB"         (D1 / H1)
+   int               tfPullback;        // khung hoi ve MA10/BB giua (H1 / M15)
    //--- Tang 1: xu huong khung lon (MN1 / W1)
-   bool              useMonthly;
+   bool              useMonthly;        // bat loc tfTrend1
    int               mnFast;
    int               mnSlow;
-   bool              useWeekly;
+   bool              useWeekly;         // bat loc tfTrend2
    int               wFast;
    int               wSlow;
    ENUM_MA_METHOD    maMethod;
@@ -57,12 +62,12 @@ struct BBRideSettings
    double            dRideThreshold;    // BUY: %B >= nguong | SELL: %B <= 1-nguong
    bool              dRequireExpansion;
    //--- Tang 3: H1 pullback
-   int               h1MaPeriod;
-   bool              h1UseBBMid;
-   double            h1TouchATR;
-   int               h1PullbackBars;
-   double            h1MinExtensionATR;
-   int               h1TrendMa;
+   int               pbMaPeriod;
+   bool              pbUseBBMid;
+   double            pbTouchATR;
+   int               pbBars;
+   double            pbMinExtATR;
+   int               pbTrendMa;
    //--- Tang 4-5: khung vao lenh
    int               entryTF;
    int               entryLookback;
@@ -102,14 +107,14 @@ struct BBRideSignal
    bool              okWeekly;
    bool              okRoom;
    bool              okDailyRide;
-   bool              okH1Pullback;
+   bool              okPullback;
    bool              okDoubleBottom;
    bool              okTrendBreak;
    bool              okTrigger;
    double            roomATR;
    double            dailyPB;
    int               dailyRideCount;
-   double            h1Zone;
+   double            pbZone;
    string            note;
   };
 
@@ -119,6 +124,10 @@ struct BBRideSignal
 void BBRideDefaults(BBRideSettings &s)
   {
    s.tradeMode         = BBRIDE_MODE_BOTH;
+   s.tfTrend1          = PERIOD_MN1;
+   s.tfTrend2          = PERIOD_W1;
+   s.tfRide            = PERIOD_D1;
+   s.tfPullback        = PERIOD_H1;
    s.useMonthly        = true;
    s.mnFast            = 5;
    s.mnSlow            = 10;
@@ -135,12 +144,12 @@ void BBRideDefaults(BBRideSettings &s)
    s.dMinRideBars      = 4;
    s.dRideThreshold    = 0.80;
    s.dRequireExpansion = true;
-   s.h1MaPeriod        = 10;
-   s.h1UseBBMid        = true;
-   s.h1TouchATR        = 0.35;
-   s.h1PullbackBars    = 6;
-   s.h1MinExtensionATR = 1.0;
-   s.h1TrendMa         = 50;
+   s.pbMaPeriod        = 10;
+   s.pbUseBBMid        = true;
+   s.pbTouchATR        = 0.35;
+   s.pbBars    = 6;
+   s.pbMinExtATR = 1.0;
+   s.pbTrendMa         = 50;
    s.entryTF           = PERIOD_M5;
    s.entryLookback     = 80;
    s.swingDepth        = 2;
@@ -152,6 +161,60 @@ void BBRideDefaults(BBRideSettings &s)
    s.slBufferATR       = 0.5;
    s.rr                = 2.0;
    s.tpAtResistance    = true;
+  }
+
+//+------------------------------------------------------------------+
+//| KICH BAN DUNG SAN (preset)                                       |
+//|  0 - SWING   : MN1+W1 xu huong -> D1 du day BB -> H1 hoi -> M5   |
+//|  1 - INTRADAY: W1+D1  xu huong -> H1 du day BB -> M15 hoi -> M5  |
+//|  2 - CUSTOM  : giu nguyen khung dang cau hinh                    |
+//|                                                                   |
+//| Ca hai kich ban chay CUNG MOT bo logic, chi khac bo khung thoi   |
+//| gian. Cung mot cach doc thi truong, ap o hai cap do khac nhau.    |
+//+------------------------------------------------------------------+
+#define BBRIDE_PRESET_SWING     0
+#define BBRIDE_PRESET_INTRADAY  1
+#define BBRIDE_PRESET_CUSTOM    2
+
+void BBRideApplyPreset(BBRideSettings &s,const int preset)
+  {
+   if(preset==BBRIDE_PRESET_SWING)
+     {
+      s.tfTrend1  = PERIOD_MN1;
+      s.tfTrend2  = PERIOD_W1;
+      s.tfRide    = PERIOD_D1;
+      s.tfPullback= PERIOD_H1;
+      s.entryTF   = PERIOD_M5;
+     }
+   else if(preset==BBRIDE_PRESET_INTRADAY)
+     {
+      s.tfTrend1  = PERIOD_W1;
+      s.tfTrend2  = PERIOD_D1;
+      s.tfRide    = PERIOD_H1;
+      s.tfPullback= PERIOD_M15;
+      s.entryTF   = PERIOD_M5;
+     }
+   //--- CUSTOM: khong dong vao gi ca
+  }
+
+//+------------------------------------------------------------------+
+//| Ten khung thoi gian de hien thi                                  |
+//+------------------------------------------------------------------+
+string BBRideTFName(const int tf)
+  {
+   switch(tf)
+     {
+      case PERIOD_M1:  return("M1");
+      case PERIOD_M5:  return("M5");
+      case PERIOD_M15: return("M15");
+      case PERIOD_M30: return("M30");
+      case PERIOD_H1:  return("H1");
+      case PERIOD_H4:  return("H4");
+      case PERIOD_D1:  return("D1");
+      case PERIOD_W1:  return("W1");
+      case PERIOD_MN1: return("MN1");
+     }
+   return("M"+IntegerToString(tf));
   }
 
 //+------------------------------------------------------------------+
@@ -284,7 +347,7 @@ double BBRideRoomATR(const string sym,const int tf,const BBRideSettings &s,
   }
 
 //+------------------------------------------------------------------+
-//| TANG 2: D1 dang "du day" theo chieu dir                          |
+//| TANG 2: khung tfRide dang "du day" theo chieu dir                 |
 //|  BUY : %B >= nguong (bam dai TREN)                               |
 //|  SELL: %B <= 1 - nguong (bam dai DUOI)                           |
 //+------------------------------------------------------------------+
@@ -294,13 +357,13 @@ bool BBRideDailyRiding(const string sym,const BBRideSettings &s,const int dir,
    rideCount=0;
    pbLast=0.0;
    int need=s.bbPeriod+s.dRideLookback+5;
-   if(!BBRideHasBars(sym,PERIOD_D1,need)) return(false);
+   if(!BBRideHasBars(sym,s.tfRide,need)) return(false);
 
    double loThreshold=1.0-s.dRideThreshold;
 
    for(int i=1;i<=s.dRideLookback;i++)
      {
-      double pb=BBRidePercentB(sym,PERIOD_D1,s.bbPeriod,s.bbDev,i);
+      double pb=BBRidePercentB(sym,s.tfRide,s.bbPeriod,s.bbDev,i);
       if(i==1) pbLast=pb;
       if(dir==BBRIDE_BUY) { if(pb>=s.dRideThreshold) rideCount++; }
       else                { if(pb<=loThreshold)      rideCount++; }
@@ -308,9 +371,9 @@ bool BBRideDailyRiding(const string sym,const BBRideSettings &s,const int dir,
    if(rideCount<s.dMinRideBars) return(false);
 
    //--- BB giua phai doc dung chieu
-   double midNow =iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,1);
-   double midPast=iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,s.dRideLookback);
-   double close1 =iClose(sym,PERIOD_D1,1);
+   double midNow =iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,1);
+   double midPast=iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,s.dRideLookback);
+   double close1 =iClose(sym,s.tfRide,1);
 
    if(dir==BBRIDE_BUY)
      {
@@ -326,34 +389,34 @@ bool BBRideDailyRiding(const string sym,const BBRideSettings &s,const int dir,
    //--- BB mo rong (chung cho ca hai chieu)
    if(s.dRequireExpansion)
      {
-      double wNow =iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_UPPER,1)
-                  -iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_LOWER,1);
-      double wPast=iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_UPPER,s.dRideLookback)
-                  -iBands(sym,PERIOD_D1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_LOWER,s.dRideLookback);
+      double wNow =iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_UPPER,1)
+                  -iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_LOWER,1);
+      double wPast=iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_UPPER,s.dRideLookback)
+                  -iBands(sym,s.tfRide,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_LOWER,s.dRideLookback);
       if(wNow<wPast) return(false);
      }
    return(true);
   }
 
 //+------------------------------------------------------------------+
-//| TANG 3: H1 hoi ve MA10 / BB giua ma KHONG gay xu huong           |
+//| TANG 3: khung tfPullback hoi ve MA10 / BB giua, KHONG gay trend   |
 //|  BUY : gia hoi XUONG vung, khong dong cua sau DUOI vung          |
 //|  SELL: gia hoi LEN  vung, khong dong cua sau TREN vung           |
 //+------------------------------------------------------------------+
-bool BBRideH1Pullback(const string sym,const BBRideSettings &s,const int dir,double &zoneOut)
+bool BBRidePullbackZone(const string sym,const BBRideSettings &s,const int dir,double &zoneOut)
   {
    zoneOut=0.0;
-   int need=MathMax(s.h1TrendMa,s.bbPeriod)+s.h1PullbackBars+30;
-   if(!BBRideHasBars(sym,PERIOD_H1,need)) return(false);
+   int need=MathMax(s.pbTrendMa,s.bbPeriod)+s.pbBars+30;
+   if(!BBRideHasBars(sym,s.tfPullback,need)) return(false);
 
-   double atr=iATR(sym,PERIOD_H1,14,1);
+   double atr=iATR(sym,s.tfPullback,14,1);
    if(atr<=0.0) return(false);
 
-   double ma10 =iMA(sym,PERIOD_H1,s.h1MaPeriod,0,s.maMethod,PRICE_CLOSE,0);
-   double bbMid=iBands(sym,PERIOD_H1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,0);
-   double bbMidPast=iBands(sym,PERIOD_H1,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,s.h1PullbackBars+3);
-   double trendMa=iMA(sym,PERIOD_H1,s.h1TrendMa,0,s.maMethod,PRICE_CLOSE,0);
-   double close1 =iClose(sym,PERIOD_H1,1);
+   double ma10 =iMA(sym,s.tfPullback,s.pbMaPeriod,0,s.maMethod,PRICE_CLOSE,0);
+   double bbMid=iBands(sym,s.tfPullback,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,0);
+   double bbMidPast=iBands(sym,s.tfPullback,s.bbPeriod,s.bbDev,0,PRICE_CLOSE,MODE_MAIN,s.pbBars+3);
+   double trendMa=iMA(sym,s.tfPullback,s.pbTrendMa,0,s.maMethod,PRICE_CLOSE,0);
+   double close1 =iClose(sym,s.tfPullback,1);
 
    //--- xu huong H1 phai con dung chieu
    if(dir==BBRIDE_BUY)
@@ -367,53 +430,53 @@ bool BBRideH1Pullback(const string sym,const BBRideSettings &s,const int dir,dou
       if(close1>trendMa)   return(false);
      }
 
-   double tol  =s.h1TouchATR*atr;
-   double price=iClose(sym,PERIOD_H1,0);
+   double tol  =s.pbTouchATR*atr;
+   double price=iClose(sym,s.tfPullback,0);
 
    //--- chon vung hoi gan gia nhat
    double zone=ma10;
-   if(s.h1UseBBMid && MathAbs(price-bbMid)<MathAbs(price-ma10)) zone=bbMid;
+   if(s.pbUseBBMid && MathAbs(price-bbMid)<MathAbs(price-ma10)) zone=bbMid;
    zoneOut=zone;
 
    if(dir==BBRIDE_BUY)
      {
       //--- 1) truoc do gia phai gian LEN khoi vung
       double maxHigh=0.0;
-      for(int i=1;i<=s.h1PullbackBars+12;i++)
+      for(int i=1;i<=s.pbBars+12;i++)
         {
-         double h=iHigh(sym,PERIOD_H1,i);
+         double h=iHigh(sym,s.tfPullback,i);
          if(h>maxHigh) maxHigh=h;
         }
-      if((maxHigh-zone)<s.h1MinExtensionATR*atr) return(false);
+      if((maxHigh-zone)<s.pbMinExtATR*atr) return(false);
 
       //--- 2) co cu cham vung tu tren xuong
       bool touched=false;
-      for(int j=0;j<=s.h1PullbackBars;j++)
-         if(iLow(sym,PERIOD_H1,j)<=zone+tol) { touched=true; break; }
+      for(int j=0;j<=s.pbBars;j++)
+         if(iLow(sym,s.tfPullback,j)<=zone+tol) { touched=true; break; }
       if(!touched) return(false);
 
       //--- 3) chua gay: khong nen nao dong cua sau DUOI vung
-      for(int k=1;k<=s.h1PullbackBars;k++)
-         if(iClose(sym,PERIOD_H1,k)<zone-tol) return(false);
+      for(int k=1;k<=s.pbBars;k++)
+         if(iClose(sym,s.tfPullback,k)<zone-tol) return(false);
       return(true);
      }
 
    //--- SELL: doi xung
    double minLow=0.0;
-   for(int i2=1;i2<=s.h1PullbackBars+12;i2++)
+   for(int i2=1;i2<=s.pbBars+12;i2++)
      {
-      double l=iLow(sym,PERIOD_H1,i2);
+      double l=iLow(sym,s.tfPullback,i2);
       if(minLow==0.0 || l<minLow) minLow=l;
      }
-   if((zone-minLow)<s.h1MinExtensionATR*atr) return(false);
+   if((zone-minLow)<s.pbMinExtATR*atr) return(false);
 
    bool touched2=false;
-   for(int j2=0;j2<=s.h1PullbackBars;j2++)
-      if(iHigh(sym,PERIOD_H1,j2)>=zone-tol) { touched2=true; break; }
+   for(int j2=0;j2<=s.pbBars;j2++)
+      if(iHigh(sym,s.tfPullback,j2)>=zone-tol) { touched2=true; break; }
    if(!touched2) return(false);
 
-   for(int k2=1;k2<=s.h1PullbackBars;k2++)
-      if(iClose(sym,PERIOD_H1,k2)>zone+tol) return(false);
+   for(int k2=1;k2<=s.pbBars;k2++)
+      if(iClose(sym,s.tfPullback,k2)>zone+tol) return(false);
    return(true);
   }
 
@@ -497,7 +560,7 @@ bool BBRideTrendLineBreak(const string sym,const BBRideSettings &s,const int dir
 //|  BUY : 2 DAY TANG DAN, neckline = dinh giua, pha LEN             |
 //|  SELL: 2 DINH GIAM DAN, neckline = day giua, pha XUONG           |
 //+------------------------------------------------------------------+
-bool BBRideSwingPattern(const string sym,const BBRideSettings &s,const int dir,const double h1Zone,
+bool BBRideSwingPattern(const string sym,const BBRideSettings &s,const int dir,const double pbZone,
                         double &piv1,double &piv2,double &neckline,
                         datetime &sigBar,string &why)
   {
@@ -538,8 +601,8 @@ bool BBRideSwingPattern(const string sym,const BBRideSettings &s,const int dir,c
    if(diff>s.maxHigherLowATR*atr) { why="Hai diem xoay qua xa nhau - khong phai tich luy"; return(false); }
 
    //--- diem xoay thu 2 phai nam trong vung hoi H1
-   double zoneTol=MathMax(s.h1TouchATR*iATR(sym,PERIOD_H1,14,1),3.0*atr);
-   if(h1Zone>0.0 && MathAbs(piv2-h1Zone)>zoneTol)
+   double zoneTol=MathMax(s.pbTouchATR*iATR(sym,s.tfPullback,14,1),3.0*atr);
+   if(pbZone>0.0 && MathAbs(piv2-pbZone)>zoneTol)
      { why="Diem xoay 2 khong nam tai vung hoi H1"; return(false); }
 
    //--- neckline: BUY = dinh cao nhat giua 2 day | SELL = day thap nhat giua 2 dinh
@@ -605,26 +668,26 @@ void BBRideEvaluateDir(const string sym,const BBRideSettings &s,const int dir,BB
    sig.piv1=0; sig.piv2=0; sig.neckline=0; sig.signalBar=0;
    sig.trendLine=0; sig.tlTime1=0; sig.tlPrice1=0; sig.tlTime2=0; sig.tlPrice2=0;
    sig.okMonthly=false; sig.okWeekly=false; sig.okRoom=false;
-   sig.okDailyRide=false; sig.okH1Pullback=false; sig.okDoubleBottom=false;
+   sig.okDailyRide=false; sig.okPullback=false; sig.okDoubleBottom=false;
    sig.okTrendBreak=false; sig.okTrigger=false;
-   sig.roomATR=0; sig.dailyPB=0; sig.dailyRideCount=0; sig.h1Zone=0; sig.note="";
+   sig.roomATR=0; sig.dailyPB=0; sig.dailyRideCount=0; sig.pbZone=0; sig.note="";
 
    string dirName=BBRideDirName(dir);
 
    //--- TANG 1: khung lon
-   sig.okMonthly = (!s.useMonthly) || BBRideTrendOK(sym,PERIOD_MN1,s.mnFast,s.mnSlow,s.maMethod,dir);
-   sig.okWeekly  = (!s.useWeekly)  || BBRideTrendOK(sym,PERIOD_W1, s.wFast, s.wSlow, s.maMethod,dir);
-   if(!sig.okMonthly) { sig.note=dirName+": MN1 chua xac nhan xu huong"; return; }
-   if(!sig.okWeekly)  { sig.note=dirName+": W1 chua xac nhan xu huong";  return; }
+   sig.okMonthly = (!s.useMonthly) || BBRideTrendOK(sym,s.tfTrend1,s.mnFast,s.mnSlow,s.maMethod,dir);
+   sig.okWeekly  = (!s.useWeekly)  || BBRideTrendOK(sym,s.tfTrend2,s.wFast, s.wSlow, s.maMethod,dir);
+   if(!sig.okMonthly) { sig.note=dirName+": "+BBRideTFName(s.tfTrend1)+" chua xac nhan xu huong"; return; }
+   if(!sig.okWeekly)  { sig.note=dirName+": "+BBRideTFName(s.tfTrend2)+" chua xac nhan xu huong";  return; }
 
    //--- TANG 1b: con du khong gian toi can gan nhat
    double level=0.0;
-   sig.roomATR=BBRideRoomATR(sym,PERIOD_W1,s,dir,level);
+   sig.roomATR=BBRideRoomATR(sym,s.tfTrend2,s,dir,level);
    sig.okRoom=(sig.roomATR>=s.minRoomATR);
    if(!sig.okRoom)
      {
       sig.note=dirName+": gia da sat "+(dir==BBRIDE_BUY?"khang cu":"ho tro")+
-               " W1 ("+DoubleToString(sig.roomATR,2)+" ATR)";
+               " "+BBRideTFName(s.tfTrend2)+" ("+DoubleToString(sig.roomATR,2)+" ATR)";
       return;
      }
 
@@ -632,19 +695,19 @@ void BBRideEvaluateDir(const string sym,const BBRideSettings &s,const int dir,BB
    sig.okDailyRide=BBRideDailyRiding(sym,s,dir,sig.dailyRideCount,sig.dailyPB);
    if(!sig.okDailyRide)
      {
-      sig.note=dirName+": D1 chua du day BB ("+IntegerToString(sig.dailyRideCount)+"/"+
-               IntegerToString(s.dMinRideBars)+" phien)";
+      sig.note=dirName+": "+BBRideTFName(s.tfRide)+" chua du day BB ("+
+               IntegerToString(sig.dailyRideCount)+"/"+IntegerToString(s.dMinRideBars)+" nen)";
       return;
      }
 
    //--- TANG 3: H1 hoi ve vung trend thuan
-   sig.okH1Pullback=BBRideH1Pullback(sym,s,dir,sig.h1Zone);
-   if(!sig.okH1Pullback)
-     { sig.note=dirName+": H1 chua hoi ve MA"+IntegerToString(s.h1MaPeriod)+"/BB giua"; return; }
+   sig.okPullback=BBRidePullbackZone(sym,s,dir,sig.pbZone);
+   if(!sig.okPullback)
+     { sig.note=dirName+": "+BBRideTFName(s.tfPullback)+" chua hoi ve MA"+IntegerToString(s.pbMaPeriod)+"/BB giua"; return; }
 
    //--- TANG 4+5: mo hinh 2 diem xoay + pha neckline
    string why="";
-   sig.okDoubleBottom=BBRideSwingPattern(sym,s,dir,sig.h1Zone,sig.piv1,sig.piv2,sig.neckline,sig.signalBar,why);
+   sig.okDoubleBottom=BBRideSwingPattern(sym,s,dir,sig.pbZone,sig.piv1,sig.piv2,sig.neckline,sig.signalBar,why);
    if(!sig.okDoubleBottom) { sig.note=dirName+": "+why; return; }
 
    //--- TANG 5b: vuot duong trend cua nhip hoi
@@ -703,7 +766,7 @@ int BBRideScore(const BBRideSignal &sig)
    if(sig.okWeekly)       n++;
    if(sig.okRoom)         n++;
    if(sig.okDailyRide)    n++;
-   if(sig.okH1Pullback)   n++;
+   if(sig.okPullback)   n++;
    if(sig.okDoubleBottom) n++;
    if(sig.okTrendBreak)   n++;
    if(sig.valid)          n++;
@@ -761,17 +824,24 @@ string BBRideStatusText(const string sym,const BBRideSettings &s,const BBRideSig
    string dirName=BBRideDirName(dir);
 
    string t="";
-   t+="=== BB RIDE MTF - "+sym+" | Che do: "+BBRideModeName(s.tradeMode)+" ===\n";
-   t+="Dang xet chieu: "+dirName+(isBuy?"  (D du day dai TREN BB)":"  (D du day dai DUOI BB)")+"\n";
-   t+=BBRideTick(sig.okMonthly)     +"1. MN1 xu huong "+(isBuy?"tang":"giam")+"\n";
-   t+=BBRideTick(sig.okWeekly)      +"2. W1 xu huong "+(isBuy?"tang":"giam")+"\n";
-   t+=BBRideTick(sig.okRoom)        +"3. Con khong gian toi "+(isBuy?"khang cu":"ho tro")+": "+
-                                     DoubleToString(sig.roomATR,2)+" ATR\n";
-   t+=BBRideTick(sig.okDailyRide)   +"4. D1 du day BB: "+IntegerToString(sig.dailyRideCount)+
-                                     " phien, %B="+DoubleToString(sig.dailyPB,2)+"\n";
-   t+=BBRideTick(sig.okH1Pullback)  +"5. H1 hoi ve vung "+DoubleToString(sig.h1Zone,d)+"\n";
+   string tfChain=BBRideTFName(s.tfTrend1)+"+"+BBRideTFName(s.tfTrend2)+" > "+
+                  BBRideTFName(s.tfRide)+" > "+BBRideTFName(s.tfPullback)+" > "+
+                  BBRideTFName(s.entryTF);
+   t+="=== BB RIDE MTF - "+sym+" | "+BBRideModeName(s.tradeMode)+" ===\n";
+   t+="Bo khung: "+tfChain+"\n";
+   t+="Dang xet chieu: "+dirName+"  ("+BBRideTFName(s.tfRide)+" du day dai "+
+      (isBuy?"TREN":"DUOI")+" BB)\n";
+   t+=BBRideTick(sig.okMonthly)     +"1. "+BBRideTFName(s.tfTrend1)+" xu huong "+(isBuy?"tang":"giam")+"\n";
+   t+=BBRideTick(sig.okWeekly)      +"2. "+BBRideTFName(s.tfTrend2)+" xu huong "+(isBuy?"tang":"giam")+"\n";
+   t+=BBRideTick(sig.okRoom)        +"3. Con khong gian toi "+(isBuy?"khang cu ":"ho tro ")+
+                                     BBRideTFName(s.tfTrend2)+": "+DoubleToString(sig.roomATR,2)+" ATR\n";
+   t+=BBRideTick(sig.okDailyRide)   +"4. "+BBRideTFName(s.tfRide)+" du day BB: "+
+                                     IntegerToString(sig.dailyRideCount)+" nen, %B="+
+                                     DoubleToString(sig.dailyPB,2)+"\n";
+   t+=BBRideTick(sig.okPullback)    +"5. "+BBRideTFName(s.tfPullback)+" hoi ve vung "+
+                                     DoubleToString(sig.pbZone,d)+"\n";
    t+=BBRideTick(sig.okDoubleBottom)+"6. "+(isBuy?"2 day tang dan":"2 dinh giam dan")+
-                                     " (M"+IntegerToString(s.entryTF)+")\n";
+                                     " ("+BBRideTFName(s.entryTF)+")\n";
    if(sig.piv1>0)
       t+="        "+(isBuy?"day1=":"dinh1=")+DoubleToString(sig.piv1,d)+
          "  "+(isBuy?"day2=":"dinh2=")+DoubleToString(sig.piv2,d)+

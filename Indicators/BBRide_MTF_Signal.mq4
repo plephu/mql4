@@ -11,7 +11,7 @@
 //|  Muon backtest hay dung EA BBRide_MTF_EA trong Strategy Tester.   |
 //+------------------------------------------------------------------+
 #property copyright "BBRide MTF"
-#property version   "1.40"
+#property version   "1.50"
 #property strict
 #property indicator_chart_window
 #property indicator_buffers 2
@@ -24,6 +24,11 @@
 
 //--- Tham so (rut gon so voi EA, phan con lai dung mac dinh)
 input int     InpTradeMode      = 0;         // 0 = ca hai chieu | 1 = chi BUY | 2 = chi SELL
+input int     InpPreset         = 0;         // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H1>M15>M5) | 2 = TU CHON
+input ENUM_TIMEFRAMES InpTfTrend1  = PERIOD_MN1; // [TU CHON] khung xu huong lon nhat
+input ENUM_TIMEFRAMES InpTfTrend2  = PERIOD_W1;  // [TU CHON] khung xu huong 2 + quet khang cu/ho tro
+input ENUM_TIMEFRAMES InpTfRide    = PERIOD_D1;  // [TU CHON] khung du day BB
+input ENUM_TIMEFRAMES InpTfPullback= PERIOD_H1;  // [TU CHON] khung hoi ve MA10/BB giua
 input bool    InpUseMonthly     = true;      // Loc xu huong MN1
 input bool    InpUseWeekly      = true;      // Loc xu huong W1
 input double  InpMinRoomATR     = 1.5;       // Khoang trong toi khang cu/ho tro (xATR W1)
@@ -32,8 +37,8 @@ input double  InpBBDev          = 2.0;       // Do lech chuan BB
 input int     InpDRideLookback  = 10;        // So phien D1 danh gia
 input int     InpDMinRideBars   = 4;         // So phien du day toi thieu
 input double  InpDRideThreshold = 0.80;      // %B nguong (SELL dung 1 - nguong)
-input int     InpH1MaPeriod     = 10;        // MA10 tren H1
-input double  InpH1TouchATR     = 0.35;      // Dung sai cham vung (xATR H1)
+input int     InpPbMaPeriod     = 10;        // MA10 tren H1
+input double  InpPbTouchATR     = 0.35;      // Dung sai cham vung (xATR H1)
 input ENUM_TIMEFRAMES InpEntryTF= PERIOD_M5; // Khung tim 2 diem xoay
 input int     InpEntryLookback  = 80;        // So nen quet
 input int     InpSwingDepth     = 2;         // Do sau fractal
@@ -78,6 +83,16 @@ int OnInit()
 
    BBRideDefaults(g_set);
    g_set.tradeMode      = InpTradeMode;
+
+   if(InpPreset==BBRIDE_PRESET_CUSTOM)
+     {
+      g_set.tfTrend1   = (int)InpTfTrend1;
+      g_set.tfTrend2   = (int)InpTfTrend2;
+      g_set.tfRide     = (int)InpTfRide;
+      g_set.tfPullback = (int)InpTfPullback;
+     }
+   else
+      BBRideApplyPreset(g_set,InpPreset);
    g_set.useMonthly     = InpUseMonthly;
    g_set.useWeekly      = InpUseWeekly;
    g_set.minRoomATR     = InpMinRoomATR;
@@ -86,17 +101,28 @@ int OnInit()
    g_set.dRideLookback  = InpDRideLookback;
    g_set.dMinRideBars   = InpDMinRideBars;
    g_set.dRideThreshold = InpDRideThreshold;
-   g_set.h1MaPeriod     = InpH1MaPeriod;
-   g_set.h1TouchATR     = InpH1TouchATR;
-   g_set.entryTF        = (int)InpEntryTF;
+   g_set.pbMaPeriod     = InpPbMaPeriod;
+   g_set.pbTouchATR     = InpPbTouchATR;
    g_set.entryLookback  = InpEntryLookback;
    g_set.swingDepth     = InpSwingDepth;
    g_set.requireTrendBreak = InpReqTrendBreak;
    g_set.rr             = InpRR;
+   g_set.entryTF        = (int)InpEntryTF;   // luon theo InpEntryTF, preset chi dat 4 khung tren
 
    if(InpTradeMode<0 || InpTradeMode>2)
      {
       Print("Loi tham so: InpTradeMode chi nhan 0, 1 hoac 2");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(InpPreset<0 || InpPreset>2)
+     {
+      Print("Loi tham so: InpPreset chi nhan 0, 1 hoac 2");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(!(g_set.tfTrend1>g_set.tfTrend2 && g_set.tfTrend2>g_set.tfRide &&
+        g_set.tfRide>g_set.tfPullback && g_set.tfPullback>g_set.entryTF))
+     {
+      Print("Loi tham so: bo khung phai giam dan");
       return(INIT_PARAMETERS_INCORRECT);
      }
    return(INIT_SUCCEEDED);
@@ -125,7 +151,7 @@ int OnCalculate(const int rates_total,const int prev_calculated,
      }
 
    //--- chi danh gia lai khi co nen moi tren khung vao lenh
-   datetime curBar=iTime(Symbol(),(int)InpEntryTF,0);
+   datetime curBar=iTime(Symbol(),g_set.entryTF,0);
    if(curBar!=g_lastCalcBar)
      {
       g_lastCalcBar=curBar;
@@ -238,7 +264,7 @@ string SizingText()
 //+------------------------------------------------------------------+
 void MarkSignal()
   {
-   if(Period()!=(int)InpEntryTF) return;         // chart khac khung -> chi canh bao
+   if(Period()!=g_set.entryTF) return;         // chart khac khung -> chi canh bao
    int shift=iBarShift(Symbol(),Period(),g_sig.signalBar,true);
    if(shift<0 || shift>=Bars) return;
 

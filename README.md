@@ -1,10 +1,27 @@
 # BBRide MTF — Hệ thống vào lệnh "D đu dây BB" cho MetaTrader 4
 
-Bộ code MQL4 hiện thực hóa quy trình giao dịch top-down, **cả hai chiều**:
+Bộ code MQL4 hiện thực hóa quy trình giao dịch top-down, **cả hai chiều**, trên **bộ khung thời gian thay đổi được**:
 
-> **BUY** — MN1/W1 còn xu hướng **tăng** và chưa chạm **kháng cự** → D1 "đu dây" dải **trên** BB → H1 hồi **xuống** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đáy tăng dần** → phá **lên** neckline **và vượt lên đường trend của nhịp hồi**.
+> **BUY** — 2 khung lớn còn xu hướng **tăng** và chưa chạm **kháng cự** → khung "đu dây" bám dải **trên** BB → khung hồi về MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đáy tăng dần** → phá **lên** neckline **và vượt lên kênh giảm** của nhịp hồi.
 >
-> **SELL** — MN1/W1 còn xu hướng **giảm** và chưa chạm **hỗ trợ** → D1 "đu dây" dải **dưới** BB → H1 hồi **lên** MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đỉnh giảm dần** → phá **xuống** neckline **và xuyên xuống đường trend của nhịp hồi**.
+> **SELL** — 2 khung lớn còn xu hướng **giảm** và chưa chạm **hỗ trợ** → khung "đu dây" bám dải **dưới** BB → khung hồi về MA10 / BB giữa → M5/M1 tích luỹ tạo **2 đỉnh giảm dần** → phá **xuống** neckline **và gãy kênh tăng** của nhịp hồi.
+
+## Hai kịch bản dựng sẵn — `InpPreset`
+
+Cùng một logic, áp ở hai cấp độ khung thời gian khác nhau:
+
+| `InpPreset` | Tên | Xu hướng lớn | Đu dây BB | Hồi trend thuần | Vào lệnh |
+|---|---|---|---|---|---|
+| **0** | **SWING** (mặc định) | MN1 + W1 | **D1** | H1 | M5 |
+| **1** | **INTRADAY** | W1 + D1 | **H1** | M15 | M5 |
+| **2** | TU CHON | tự đặt 4 khung qua `InpTfTrend1..InpTfPullback` | | | |
+
+- Preset **0**: sóng dài, ít tín hiệu, lệnh giữ nhiều ngày. Kháng cự/hỗ trợ quét trên **W1**.
+- Preset **1**: sóng ngắn, tín hiệu nhiều hơn, lệnh giữ trong ngày đến vài ngày. Kháng cự/hỗ trợ quét trên **D1**.
+- Bộ khung bắt buộc **giảm dần** (khung 1 > khung 2 > đu dây > hồi > vào lệnh), sai thứ tự thì EA từ chối khởi động kèm thông báo rõ.
+- `InpEntryTF` (M5/M1) luôn do anh quyết, preset không ghi đè.
+
+Muốn chạy cả hai kịch bản cùng lúc trên một cặp: mở **2 chart**, một chart `InpPreset=0`, một chart `InpPreset=1`, **cùng `InpMagic`** để hạn mức rủi ro vẫn gộp chung.
 
 Chọn chiều bằng `InpTradeMode`: `0` = cả hai (mặc định), `1` = chỉ BUY, `2` = chỉ SELL.
 
@@ -74,10 +91,10 @@ Cả 3 file đều cần thiết: EA và Indicator không tự chạy được n
 
 | Tầng | BUY | SELL |
 |---|---|---|
-| 1. MN1 + W1 | EMA nhanh > chậm, dốc lên, giá đóng > EMA chậm | EMA nhanh < chậm, dốc xuống, giá đóng < EMA chậm |
-| 1b. Cản | **Kháng cự** = đỉnh fractal gần nhất **trên** giá; cần ≥ 1.5 ATR khoảng trống | **Hỗ trợ** = đáy fractal gần nhất **dưới** giá; cần ≥ 1.5 ATR khoảng trống |
-| 2. D1 đu dây | `%B ≥ 0.80` (bám dải **trên**), BB giữa **dốc lên**, giá đóng > BB giữa | `%B ≤ 0.20` (bám dải **dưới**), BB giữa **dốc xuống**, giá đóng < BB giữa |
-| 3. H1 hồi | Giá hồi **xuống** MA10/BB giữa; không nến nào đóng sâu **dưới** vùng; giá còn **trên** MA50 | Giá hồi **lên** MA10/BB giữa; không nến nào đóng sâu **trên** vùng; giá còn **dưới** MA50 |
+| 1. Hai khung lớn | EMA nhanh > chậm, dốc lên, giá đóng > EMA chậm | EMA nhanh < chậm, dốc xuống, giá đóng < EMA chậm |
+| 1b. Cản (quét trên khung lớn thứ 2) | **Kháng cự** = đỉnh fractal gần nhất **trên** giá; cần ≥ 1.5 ATR khoảng trống | **Hỗ trợ** = đáy fractal gần nhất **dưới** giá; cần ≥ 1.5 ATR khoảng trống |
+| 2. Khung đu dây | `%B ≥ 0.80` (bám dải **trên**), BB giữa **dốc lên**, giá đóng > BB giữa | `%B ≤ 0.20` (bám dải **dưới**), BB giữa **dốc xuống**, giá đóng < BB giữa |
+| 3. Khung hồi | Giá hồi **xuống** MA10/BB giữa; không nến nào đóng sâu **dưới** vùng; giá còn **trên** MA50 | Giá hồi **lên** MA10/BB giữa; không nến nào đóng sâu **trên** vùng; giá còn **dưới** MA50 |
 | 4. M5/M1 | **2 đáy tăng dần** (đáy 2 > đáy 1) | **2 đỉnh giảm dần** (đỉnh 2 < đỉnh 1) |
 | 5. Trigger — neckline | Neckline = **đỉnh** giữa 2 đáy; đóng cửa **phá lên** | Neckline = **đáy** giữa 2 đỉnh; đóng cửa **phá xuống** |
 | 5b. Trigger — vượt trend | Đường trend nối **2 đỉnh giảm dần** của nhịp hồi; đóng cửa **vượt lên** | Đường trend nối **2 đáy tăng dần** của nhịp hồi; đóng cửa **xuyên xuống** |
@@ -85,34 +102,40 @@ Cả 3 file đều cần thiết: EA và Indicator không tự chạy được n
 
 Điều kiện "BB đang mở rộng" (`InpDReqExpansion`) và "biên độ co lại" (`InpReqContraction`) dùng chung cho cả hai chiều — chúng đo độ rộng, không có hướng.
 
-### Tầng 1 — Xu hướng khung lớn (MN1 + W1)
+### Tầng 1 — Xu hướng 2 khung lớn
 
-Khung được coi là **tăng** khi đồng thời: MA nhanh > MA chậm (mặc định EMA5/EMA10 cho MN1; EMA10/EMA20 cho W1), MA nhanh dốc lên, MA chậm không quay đầu, giá đóng cửa nến gần nhất > MA chậm. Chiều **giảm** đảo ngược toàn bộ 4 điều kiện.
+Khung được coi là **tăng** khi đồng thời: MA nhanh > MA chậm (mặc định EMA5/EMA10 cho khung 1; EMA10/EMA20 cho khung 2), MA nhanh dốc lên, MA chậm không quay đầu, giá đóng cửa nến gần nhất > MA chậm. Chiều **giảm** đảo ngược toàn bộ 4 điều kiện.
+
+Với preset SWING, khung 1 = MN1 và khung 2 = W1. Với preset INTRADAY, khung 1 = W1 và khung 2 = D1 — đúng như "khung lớn D, W vẫn xu hướng tăng hoặc giảm".
 
 ### Tầng 1b — "Chưa đến kháng cự / hỗ trợ"
 
-- BUY: quét đỉnh fractal trên W1, lấy đỉnh **thấp nhất nằm trên** giá hiện tại.
-- SELL: quét đáy fractal trên W1, lấy đáy **cao nhất nằm dưới** giá hiện tại.
-- Khoảng trống `room = |cản − giá| / ATR(W1,14)`, yêu cầu `≥ InpMinRoomATR` (mặc định 1.5).
+Quét trên **khung lớn thứ 2** (W1 với preset SWING, D1 với preset INTRADAY):
+
+- BUY: quét đỉnh fractal, lấy đỉnh **thấp nhất nằm trên** giá hiện tại.
+- SELL: quét đáy fractal, lấy đáy **cao nhất nằm dưới** giá hiện tại.
+- Khoảng trống `room = |cản − giá| / ATR(14)` của khung đó, yêu cầu `≥ InpMinRoomATR` (mặc định 1.5).
 - Không còn cản nào chắn đường (giá ở vùng đỉnh/đáy lịch sử) → coi như trống hoàn toàn, điều kiện đạt.
 
-### Tầng 2 — D1 "đu dây BB"
+### Tầng 2 — "Đu dây BB" trên khung đu dây (D1 hoặc H1)
 
-Với BB(20, 2.0) trên D1, `%B = (Close − Lower) / (Upper − Lower)`:
+Với BB(20, 2.0) trên khung đó, `%B = (Close − Lower) / (Upper − Lower)`:
 
-- **BUY**: đếm phiên có `%B ≥ InpDRideThreshold` (0.80) trong `InpDRideLookback` phiên gần nhất, cần ≥ `InpDMinRideBars` (4).
+- **BUY**: đếm nến có `%B ≥ InpDRideThreshold` (0.80) trong `InpDRideLookback` nến gần nhất, cần ≥ `InpDMinRideBars` (4).
 - **SELL**: dùng ngưỡng đối xứng `%B ≤ 1 − InpDRideThreshold` (tức ≤ 0.20). Một tham số điều khiển cả hai chiều.
 - BB giữa phải dốc đúng chiều và giá đóng cửa nằm đúng phía so với BB giữa.
 - Tuỳ chọn `InpDReqExpansion`: độ rộng dải hiện tại ≥ độ rộng đầu cửa sổ.
 
 **Vì sao dùng ngưỡng 0.80/0.20 thay vì "đóng cửa vượt hẳn dải"?** Đóng cửa xuyên hẳn dải là hiếm và thường là điểm kiệt sức ngắn hạn. Bám sát vùng 80–100% (hoặc 0–20%) dải mới đúng bản chất "đu dây" bền của một xu hướng mạnh. Siết lên 0.90 nếu muốn khắt khe hơn.
 
-### Tầng 3 — H1 hồi về trend thuần
+### Tầng 3 — Khung hồi về trend thuần (H1 hoặc M15)
 
-- Vùng hồi = **MA10 (H1)** hoặc **BB giữa (H1)** — code tự chọn mức gần giá hơn (tắt BB giữa bằng `InpH1UseBBMid=false`).
-- Trước đó giá phải giãn khỏi vùng ít nhất `InpH1MinExtATR` × ATR(H1) — BUY đo đỉnh cao nhất, SELL đo đáy thấp nhất — để chắc chắn có sóng đủ lớn rồi mới hồi.
-- Trong `InpH1PullbackBars` nến gần nhất phải có nến chạm vùng (BUY: `Low ≤ vùng + dung sai`; SELL: `High ≥ vùng − dung sai`).
-- **Chưa gãy**: không nến H1 nào đóng cửa vượt sâu qua vùng theo chiều ngược; BB giữa H1 vẫn dốc đúng chiều; giá vẫn đúng phía so với MA50 H1.
+- Vùng hồi = **MA10** hoặc **BB giữa** của khung hồi — code tự chọn mức gần giá hơn (tắt BB giữa bằng `InpPbUseBBMid=false`).
+- Trước đó giá phải giãn khỏi vùng ít nhất `InpPbMinExtATR` × ATR — BUY đo đỉnh cao nhất, SELL đo đáy thấp nhất — để chắc chắn có sóng đủ lớn rồi mới hồi.
+- Trong `InpPbBars` nến gần nhất phải có nến chạm vùng (BUY: `Low ≤ vùng + dung sai`; SELL: `High ≥ vùng − dung sai`).
+- **Chưa gãy**: không nến nào đóng cửa vượt sâu qua vùng theo chiều ngược; BB giữa vẫn dốc đúng chiều; giá vẫn đúng phía so với MA50 của khung hồi.
+
+Tham số đổi tên từ `InpH1*` sang `InpPb*` (pullback) vì khung này không còn cố định là H1.
 
 ### Tầng 4 — M5/M1: tích luỹ, 2 điểm xoay
 
@@ -158,11 +181,12 @@ Nếu không tìm được 2 điểm xoay ngược chiều, hoặc chúng **khô
 
 | Tham số | Mặc định | Ý nghĩa / gợi ý tinh chỉnh |
 |---|---|---|
+| `InpPreset` | 0 | 0 = SWING (D1 đu dây), 1 = INTRADAY (H1 đu dây), 2 = tự chọn 4 khung |
 | `InpTradeMode` | 0 | 0 = cả hai chiều, 1 = chỉ BUY, 2 = chỉ SELL. Khi để 0, EA xét BUY trước; không đạt mới xét SELL |
 | `InpMinRoomATR` | 1.5 | Tăng lên 2.0–2.5 nếu hay bị chặn ở kháng cự/hỗ trợ |
 | `InpDMinRideBars` | 4 | Tăng lên 5–6 để chỉ bắt xu hướng thật mạnh (ít lệnh hơn) |
 | `InpDRideThreshold` | 0.80 | 0.90 = khắt khe hơn (SELL tự dùng ngưỡng đối xứng 0.10) |
-| `InpH1TouchATR` | 0.35 | Nới lên 0.5 nếu ít tín hiệu, siết 0.25 nếu vào quá sớm |
+| `InpPbTouchATR` | 0.35 | Nới lên 0.5 nếu ít tín hiệu, siết 0.25 nếu vào quá sớm |
 | `InpEntryTF` | M5 | M1 cho tín hiệu nhiều và nhiễu hơn; M5 cân bằng tốt hơn |
 | `InpReqTrendBreak` | true | Bắt buộc vượt đường trend nhịp hồi. Tắt (`false`) nếu muốn nhiều tín hiệu hơn, chấp nhận nhiều phá giả hơn |
 | `InpReqNeckBreak` | true | Bắt buộc phá neckline ngang. Tắt cả hai = vào lệnh ngay khi có mô hình 2 điểm xoay (**không khuyến nghị**) |
@@ -316,6 +340,7 @@ Dashboard hiển thị đủ 3 con số: `Lenh mo: 1/1 (cap nay) | Toan TK: 2/3 
 
 ## 6. Giới hạn cần biết (nói rõ, không tô hồng)
 
+- **Hai kịch bản khung dùng chung một bộ tham số kỹ thuật** (`InpBBPeriod`, `InpPbTouchATR`, `InpSLBufferATR`...). Preset INTRADAY chạy trên khung nhỏ hơn nên nhiễu nhiều hơn — nhiều khả năng cần siết `InpDMinRideBars` lên 5–6 và `InpPbTouchATR` xuống 0.25. Tôi chưa backtest để khẳng định con số, anh phải tự kiểm chứng.
 - **Hai chiều dùng chung một bộ tham số.** Thực tế thị trường không đối xứng: xu hướng giảm thường nhanh và dốc hơn xu hướng tăng, nên `InpSLBufferATR` và `InpH1TouchATR` tối ưu cho BUY chưa chắc tối ưu cho SELL. Nếu backtest cho thấy lệch rõ, hãy chạy 2 chart riêng cho cùng một cặp: một chart `InpTradeMode=1`, một chart `InpTradeMode=2`, với tham số khác nhau (nhớ giữ cùng `InpMagic` để hạn mức rủi ro vẫn gộp).
 - **Indicator chỉ đánh giá thời gian thực**, không vẽ lại toàn bộ tín hiệu lịch sử (logic dùng dữ liệu đa khung tại nến hiện tại). Muốn thống kê lịch sử, dùng EA trong Strategy Tester.
 - **"Kháng cự" chỉ dựa trên đỉnh fractal W1**, chưa tính Fibonacci, số tròn, vùng cung/cầu hay khối lượng — nếu bạn dùng thêm các mốc này, hãy siết `InpMinRoomATR`.
@@ -327,16 +352,17 @@ Dashboard hiển thị đủ 3 con số: `Lenh mo: 1/1 (cap nay) | Toan TK: 2/3 
 ## 7. Đọc dashboard trên chart
 
 ```
-=== BB RIDE MTF - GBPJPY | Che do: CA HAI CHIEU ===
-Dang xet chieu: SELL  (D du day dai DUOI BB)
-[OK]  1. MN1 xu huong giam
-[OK]  2. W1 xu huong giam
-[OK]  3. Con khong gian toi ho tro: 3.10 ATR
-[OK]  4. D1 du day BB: 6 phien, %B=0.09
-[OK]  5. H1 hoi ve vung 188.420
+=== BB RIDE MTF - GBPJPY | CA HAI CHIEU ===
+Bo khung: W1+D1 > H1 > M15 > M5
+Dang xet chieu: SELL  (H1 du day dai DUOI BB)
+[OK]  1. W1 xu huong giam
+[OK]  2. D1 xu huong giam
+[OK]  3. Con khong gian toi ho tro D1: 3.10 ATR
+[OK]  4. H1 du day BB: 6 nen, %B=0.09
+[OK]  5. M15 hoi ve vung 188.420
 [OK]  6. 2 dinh giam dan (M5)
         dinh1=188.640  dinh2=188.410  neck=188.150
-[--]  7. Xuyen XUONG duong trend nhip hoi
+[--]  7. Xuyen XUONG duong trend nhip hoi (gay kenh tang)
 Trang thai: SELL: Chua XUYEN XUONG duong trend 188.372
 ---------------- QUAN TRI RUI RO ----------------
 Risk/lenh: 0.75%
