@@ -4,7 +4,7 @@
 //|                                                                   |
 //|  BO KHUNG THAY DOI DUOC (InpPreset):                              |
 //|   0 SWING   : MN1+W1 > D1 du day BB > H1 hoi  > M5 vao lenh       |
-//|   1 INTRADAY: W1+D1  > H1 du day BB > M15 hoi > M5 vao lenh       |
+//|   1 INTRADAY: W1+D1  > H4 du day BB > M15 hoi > M5 vao lenh       |
 //|   2 TU CHON : tu dat 4 khung                                      |
 //|                                                                   |
 //|  CHIEU BUY:                                                       |
@@ -43,7 +43,7 @@ input int     InpTradeMode      = 0;       // 0 = ca hai chieu | 1 = chi BUY | 2
 
 //--- ================= BO KHUNG THOI GIAN ==========================
 input string  __g0b__           = "===== BO KHUNG THOI GIAN =====";
-input int     InpPreset         = 0;       // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H1>M15>M5) | 2 = TU CHON
+input int     InpPreset         = 0;       // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H4>M15>M5) | 2 = TU CHON
 input ENUM_TIMEFRAMES InpTfTrend1  = PERIOD_MN1; // [TU CHON] khung xu huong lon nhat
 input ENUM_TIMEFRAMES InpTfTrend2  = PERIOD_W1;  // [TU CHON] khung xu huong 2 + quet khang cu/ho tro
 input ENUM_TIMEFRAMES InpTfRide    = PERIOD_D1;  // [TU CHON] khung du day BB

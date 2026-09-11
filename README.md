@@ -13,7 +13,7 @@ Cùng một logic, áp ở hai cấp độ khung thời gian khác nhau:
 | `InpPreset` | Tên | Xu hướng lớn | Đu dây BB | Hồi trend thuần | Vào lệnh |
 |---|---|---|---|---|---|
 | **0** | **SWING** (mặc định) | MN1 + W1 | **D1** | H1 | M5 |
-| **1** | **INTRADAY** | W1 + D1 | **H1** | M15 | M5 |
+| **1** | **INTRADAY** | W1 + D1 | **H4** | M15 | M5 |
 | **2** | TU CHON | tự đặt 4 khung qua `InpTfTrend1..InpTfPullback` | | | |
 
 - Preset **0**: sóng dài, ít tín hiệu, lệnh giữ nhiều ngày. Kháng cự/hỗ trợ quét trên **W1**.
@@ -181,7 +181,7 @@ Nếu không tìm được 2 điểm xoay ngược chiều, hoặc chúng **khô
 
 | Tham số | Mặc định | Ý nghĩa / gợi ý tinh chỉnh |
 |---|---|---|
-| `InpPreset` | 0 | 0 = SWING (D1 đu dây), 1 = INTRADAY (H1 đu dây), 2 = tự chọn 4 khung |
+| `InpPreset` | 0 | 0 = SWING (D1 đu dây), 1 = INTRADAY (H4 đu dây), 2 = tự chọn 4 khung |
 | `InpTradeMode` | 0 | 0 = cả hai chiều, 1 = chỉ BUY, 2 = chỉ SELL. Khi để 0, EA xét BUY trước; không đạt mới xét SELL |
 | `InpMinRoomATR` | 1.5 | Tăng lên 2.0–2.5 nếu hay bị chặn ở kháng cự/hỗ trợ |
 | `InpDMinRideBars` | 4 | Tăng lên 5–6 để chỉ bắt xu hướng thật mạnh (ít lệnh hơn) |

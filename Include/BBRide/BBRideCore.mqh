@@ -166,7 +166,7 @@ void BBRideDefaults(BBRideSettings &s)
 //+------------------------------------------------------------------+
 //| KICH BAN DUNG SAN (preset)                                       |
 //|  0 - SWING   : MN1+W1 xu huong -> D1 du day BB -> H1 hoi -> M5   |
-//|  1 - INTRADAY: W1+D1  xu huong -> H1 du day BB -> M15 hoi -> M5  |
+//|  1 - INTRADAY: W1+D1  xu huong -> H4 du day BB -> M15 hoi -> M5  |
 //|  2 - CUSTOM  : giu nguyen khung dang cau hinh                    |
 //|                                                                   |
 //| Ca hai kich ban chay CUNG MOT bo logic, chi khac bo khung thoi   |
@@ -190,7 +190,7 @@ void BBRideApplyPreset(BBRideSettings &s,const int preset)
      {
       s.tfTrend1  = PERIOD_W1;
       s.tfTrend2  = PERIOD_D1;
-      s.tfRide    = PERIOD_H1;
+      s.tfRide    = PERIOD_H4;
       s.tfPullback= PERIOD_M15;
       s.entryTF   = PERIOD_M5;
      }

@@ -24,7 +24,7 @@
 
 //--- Tham so (rut gon so voi EA, phan con lai dung mac dinh)
 input int     InpTradeMode      = 0;         // 0 = ca hai chieu | 1 = chi BUY | 2 = chi SELL
-input int     InpPreset         = 0;         // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H1>M15>M5) | 2 = TU CHON
+input int     InpPreset         = 0;         // 0 = SWING (MN1+W1>D1>H1>M5) | 1 = INTRADAY (W1+D1>H4>M15>M5) | 2 = TU CHON
 input ENUM_TIMEFRAMES InpTfTrend1  = PERIOD_MN1; // [TU CHON] khung xu huong lon nhat
 input ENUM_TIMEFRAMES InpTfTrend2  = PERIOD_W1;  // [TU CHON] khung xu huong 2 + quet khang cu/ho tro
 input ENUM_TIMEFRAMES InpTfRide    = PERIOD_D1;  // [TU CHON] khung du day BB
